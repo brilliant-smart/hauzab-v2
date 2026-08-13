@@ -1,0 +1,41 @@
+# ===== Env / secrets =====
+.env
+.env.*
+!.env.example
+
+# ===== OS / editor =====
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ===== Backend (Laravel) =====
+backend/vendor
+backend/node_modules
+backend/public/hot
+backend/public/storage
+backend/storage/app/*
+!backend/storage/app/.gitignore
+backend/storage/framework/*
+!backend/storage/framework/.gitignore
+backend/storage/logs/*
+!backend/storage/logs/.gitignore
+backend/.phpunit.result.cache
+backend/.phpstorm.meta.php
+
+# ===== Frontend (Vite/Node) =====
+frontend/node_modules
+frontend/dist
+frontend/dist-storefront
+frontend/dist-admin
+frontend/.vite
+
+# ===== Logs / misc =====
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ===== Built docs (keep .docx plan at repo root? no — it lives in parent) =====
