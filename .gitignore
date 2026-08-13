@@ -16,6 +16,9 @@ backend/vendor
 backend/node_modules
 backend/public/hot
 backend/public/storage
+backend/public/index.html
+backend/public/assets
+backend/public/build
 backend/storage/app/*
 !backend/storage/app/.gitignore
 backend/storage/framework/*

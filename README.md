@@ -9,7 +9,7 @@ Multi-tenant, offline-first inventory + POS system. Rewrite of the existing Hauz
 > Full plan: `../hauzab-v2-plan.docx` (sections A–G).
 
 ## Stack
-- **Backend:** Laravel 12, PHP 8.4, API-only, Sanctum token auth + custom AuthController.
+- **Backend:** Laravel 13, PHP 8.4, API-only, Sanctum token auth + custom AuthController.
 - **Frontend:** React 18 + TypeScript + Vite + Tailwind + shadcn/ui + TanStack Query + react-hook-form/zod + sonner.
 - **Cashier client:** browser-only on the LAN (no Electron).
 - **Database:** MariaDB, single shared DB, multi-tenant via `tenant_id` + `branch_id` + `device_id` + global scopes.
@@ -36,7 +36,7 @@ cloud-authoritative; audit on the cloud.
 
 ## Layout (to be created in Phase 0)
 ```
-backend/    Laravel 12 API + SPA host
+backend/    Laravel 13 API + SPA host
 frontend/   React + Vite + TS + Tailwind + shadcn
 ```
 
