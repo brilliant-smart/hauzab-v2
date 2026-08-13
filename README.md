@@ -27,8 +27,8 @@ Sync: outbox pattern with UUID idempotency keys; sales append-only; master data
 cloud-authoritative; audit on the cloud.
 
 ## Phases
-0. Foundation — monorepo scaffold, Sanctum auth + roles, multi-tenant foundation, VPS deploy pipeline
-1. Catalog & users (products, categories, suppliers, manufacturers, units, users/roles)
+0. ✅ Foundation — monorepo scaffold, Sanctum auth + roles, multi-tenant foundation, VPS deploy pipeline
+1. ✅ Catalog & users (products, categories, suppliers, manufacturers, units, users/roles)
 2. POS, offline-first (cart, checkout, receipts 58mm + 80mm + A4, payments)
 3. Sync engine (outbox ↔ cloud, master-data pull, online audit/reports)
 4. Expenses, reports, audit, low-stock, expiry, daily_logs + data migration from `hauzab_db` & `pharmacy`

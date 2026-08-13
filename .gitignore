@@ -19,6 +19,7 @@ backend/public/storage
 backend/public/index.html
 backend/public/assets
 backend/public/build
+backend/public/favicon.*
 backend/storage/app/*
 !backend/storage/app/.gitignore
 backend/storage/framework/*
