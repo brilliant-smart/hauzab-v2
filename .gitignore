@@ -34,6 +34,7 @@ frontend/dist
 frontend/dist-storefront
 frontend/dist-admin
 frontend/.vite
+frontend/*.tsbuildinfo
 
 # ===== Logs / misc =====
 *.log
