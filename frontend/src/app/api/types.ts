@@ -85,6 +85,72 @@ export interface ListResponse<T> {
   data: T[];
 }
 
+export interface Customer {
+  id: number;
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  created_at?: string;
+}
+
+export type OrderStatusValue = "pending" | "completed" | "voided";
+export type PaymentMethodValue = "cash" | "pos" | "transfer";
+
+export interface OrderItem {
+  id: number;
+  product_id: number | null;
+  product_name: string;
+  barcode?: string | null;
+  quantity: string;
+  unit_price: string;
+  line_total: string;
+}
+
+export interface OrderPayment {
+  id: number;
+  method: { value: PaymentMethodValue; label: string };
+  amount: string;
+}
+
+export interface Order {
+  id: number;
+  number: string;
+  uuid: string;
+  status: { value: OrderStatusValue; label: string };
+  subtotal: string;
+  discount: string;
+  total: string;
+  amount_paid: string;
+  change: string;
+  customer_id: number | null;
+  customer_name: string | null;
+  note: string | null;
+  items: OrderItem[];
+  payments: OrderPayment[];
+  customer?: { id: number; name: string; phone?: string | null } | null;
+  user?: { id: number; name: string } | null;
+  tenant?: {
+    id: number;
+    name: string;
+    address?: string | null;
+    phone?: string | null;
+    email?: string | null;
+  } | null;
+  branch?: { id: number; name: string } | null;
+  created_at?: string;
+}
+
+export interface CreateOrderPayload {
+  uuid: string;
+  items: { product_id: number; quantity: number; unit_price: number }[];
+  discount?: number;
+  payments: { method: PaymentMethodValue; amount: number }[];
+  customer_id?: number | null;
+  customer_name?: string | null;
+  note?: string | null;
+}
+
 export const ROLE_OPTIONS: { value: Role; label: string }[] = [
   { value: "admin", label: "Admin" },
   { value: "supervisor", label: "Supervisor" },

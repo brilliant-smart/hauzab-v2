@@ -7,7 +7,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
-  ShieldAlert,
+  Receipt,
   ShoppingCart,
   Users,
 } from "lucide-react";
@@ -55,6 +55,11 @@ const MANAGER_NAV: NavItem[] = [
     children: PRODUCTS_CHILDREN,
   },
   { to: "/employees", label: "Employee Record", icon: Users },
+];
+
+const POS_NAV: NavItem[] = [
+  { to: "/pos", label: "Make Sale", icon: ShoppingCart, end: true },
+  { to: "/pos/history", label: "Sales History", icon: Receipt },
 ];
 
 function NavRow({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }) {
@@ -107,9 +112,24 @@ function NavRow({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }
 }
 
 function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
-  return <nav className="space-y-1 px-2 py-4">{MANAGER_NAV.map((item) => (
-    <NavRow key={item.label} item={item} onNavigate={onNavigate} />
-  ))}</nav>;
+  const { user } = useAuth();
+  const canManage = isAtLeast(user, "supervisor");
+
+  return (
+    <nav className="space-y-1 px-2 py-4">
+      {POS_NAV.map((item) => (
+        <NavRow key={item.label} item={item} onNavigate={onNavigate} />
+      ))}
+      {canManage && (
+        <>
+          <div className="my-2 border-t" />
+          {MANAGER_NAV.map((item) => (
+            <NavRow key={item.label} item={item} onNavigate={onNavigate} />
+          ))}
+        </>
+      )}
+    </nav>
+  );
 }
 
 function UserMenu() {
@@ -138,10 +158,7 @@ function UserMenu() {
 }
 
 export default function AppLayout() {
-  const { user } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
-
-  const canManage = isAtLeast(user, "supervisor");
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -152,14 +169,7 @@ export default function AppLayout() {
             <ShoppingCart className="size-5 text-primary" />
             <span className="text-lg font-semibold">Hauzab</span>
           </div>
-          {canManage ? (
-            <SidebarBody />
-          ) : (
-            <div className="p-4 text-sm text-muted-foreground">
-              <ShieldAlert className="mb-2 size-5" />
-              Cashier tools arrive in the next phase.
-            </div>
-          )}
+          <SidebarBody />
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">

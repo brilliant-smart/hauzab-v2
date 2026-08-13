@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { useAuth } from "@/app/auth/AuthContext";
+import { homePathFor } from "@/app/auth/guards";
 import { handleApiError } from "@/app/lib/errorHandler";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,14 +27,14 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 export default function Login() {
-  const { isAuthenticated, login, loading } = useAuth();
+  const { isAuthenticated, login, loading, user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate("/dashboard", { replace: true });
+      navigate(homePathFor(user), { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, user, navigate]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -44,7 +45,7 @@ export default function Login() {
     try {
       const user = await login(values.email, values.password);
       toast.success(`Welcome back, ${user.name}`);
-      navigate("/dashboard", { replace: true });
+      navigate(homePathFor(user), { replace: true });
     } catch (error) {
       handleApiError(error, "Unable to sign in. Please check your credentials.");
     }

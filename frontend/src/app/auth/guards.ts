@@ -16,3 +16,7 @@ export const isAtLeast = (user: User | null, role: User["role"]) => {
   };
   return !!user && rank[user.role] >= rank[role];
 };
+
+/** Front-line cashiers land on the register; managers land on the dashboard. */
+export const homePathFor = (user: User | null) =>
+  user && user.role === "staff" ? "/pos" : "/dashboard";

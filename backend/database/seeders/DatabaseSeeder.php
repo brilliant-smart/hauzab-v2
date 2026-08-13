@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Enums\Role;
 use App\Models\Branch;
+use App\Models\Customer;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\ProductManufacturer;
@@ -19,8 +20,20 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $tenants = [
-            ['name' => 'Hauzab Supermarket', 'slug' => 'supermarket'],
-            ['name' => 'Hauzab Pharmacy', 'slug' => 'pharmacy'],
+            [
+                'name' => 'Hauzab Supermarket',
+                'slug' => 'supermarket',
+                'address' => '12 Market Road, Lagos',
+                'phone' => '0801 234 5678',
+                'email' => 'sales@hauzabsupermarket.com',
+            ],
+            [
+                'name' => 'Hauzab Pharmacy',
+                'slug' => 'pharmacy',
+                'address' => '5 Health Avenue, Ibadan',
+                'phone' => '0802 987 6543',
+                'email' => 'care@hauzabpharmacy.com',
+            ],
         ];
 
         $adminBySlug = [
@@ -86,6 +99,23 @@ class DatabaseSeeder extends Seeder
             }
 
             $this->seedCatalog($tenant, $catalog[$tenant->slug]);
+            $this->seedCustomers($tenant);
+        }
+    }
+
+    private function seedCustomers(Tenant $tenant): void
+    {
+        $people = [
+            ['name' => 'Walk-in Customer', 'phone' => null, 'address' => null],
+            ['name' => 'Chinedu Okafor', 'phone' => '0803 111 2222', 'address' => 'Surulere, Lagos'],
+            ['name' => 'Aisha Bello', 'phone' => '0805 333 4444', 'address' => 'Bodija, Ibadan'],
+        ];
+
+        foreach ($people as $p) {
+            Customer::firstOrCreate(
+                ['tenant_id' => $tenant->id, 'name' => $p['name']],
+                ['phone' => $p['phone'], 'address' => $p['address']]
+            );
         }
     }
 

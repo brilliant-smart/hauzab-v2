@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductManufacturerController;
@@ -32,6 +34,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('product-manufacturers', [ProductManufacturerController::class, 'index']);
     Route::get('product-suppliers', [ProductSupplierController::class, 'index']);
 
+    // Register and customers — any signed-in staff member can ring up sales.
+    Route::get('orders', [OrderController::class, 'index']);
+    Route::post('orders', [OrderController::class, 'store']);
+    Route::get('orders/{order}', [OrderController::class, 'show']);
+    Route::apiResource('customers', CustomerController::class);
+
     // Catalog and employee management — admins and supervisors only.
     Route::middleware('role:admin|supervisor')->group(function () {
         Route::post('products', [ProductController::class, 'store']);
@@ -45,5 +53,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('product-suppliers', ProductSupplierController::class)->except(['index']);
 
         Route::apiResource('users', UserController::class);
+
+        // Voiding a completed sale is a manager action.
+        Route::post('orders/{order}/void', [OrderController::class, 'void']);
     });
 });
