@@ -7,15 +7,23 @@ use App\Enums\PaymentMethod;
 use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\OrderResource;
+use App\Models\AuditLog;
+use App\Models\Device;
 use App\Models\Order;
 use App\Models\Product;
-use Illuminate\Database\QueryException;
+use App\Models\SyncOutbox;
+use App\Services\OrderPersistence;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class OrderController extends Controller
 {
+    public function __construct(
+        private readonly OrderPersistence $persistence,
+    ) {
+    }
+
     public function index(Request $request)
     {
         $user = $request->user();
@@ -42,9 +50,10 @@ class OrderController extends Controller
     public function store(Request $request)
     {
         $data = $this->validated($request);
+        $user = $request->user();
 
         // Idempotent checkout: a retried POST carries the same client UUID.
-        // The Phase 3 sync engine relies on this to avoid double-posting.
+        // The sync engine relies on this to avoid double-posting.
         $existing = Order::where('uuid', $data['uuid'])->first();
         if ($existing) {
             return (new OrderResource($existing->load(['items', 'payments', 'customer', 'user', 'tenant', 'branch'])))
@@ -52,9 +61,27 @@ class OrderController extends Controller
                 ->setStatusCode(200);
         }
 
-        $order = $this->createOrder($request, $data);
+        $order = $this->persistence->create(
+            $data,
+            $user->tenant_id,
+            $user->branch_id,
+            $user->id,
+            $data['device_id'] ?? null,
+        )->load(['items', 'payments', 'customer', 'user', 'tenant', 'branch']);
 
-        return (new OrderResource($order->load(['items', 'payments', 'customer', 'user', 'tenant', 'branch'])))
+        // Queue the cloud push and audit entry once the sale is durable.
+        // The duplicate-uuid return above ensures this only runs for new orders.
+        DB::afterCommit(function () use ($order) {
+            SyncOutbox::create([
+                'tenant_id' => $order->tenant_id,
+                'kind' => 'order',
+                'order_uuid' => $order->uuid,
+                'payload' => (new OrderResource($order))->resolve(request()),
+            ]);
+            AuditLog::record('order.created', $order);
+        });
+
+        return (new OrderResource($order))
             ->response()
             ->setStatusCode(201);
     }
@@ -82,142 +109,23 @@ class OrderController extends Controller
             $order->update(['status' => OrderStatus::Voided->value]);
         });
 
-        return new OrderResource($order->load(['items', 'payments', 'customer', 'user', 'tenant', 'branch']));
-    }
-
-    private function createOrder(Request $request, array $data): Order
-    {
-        $user = $request->user();
-
-        // Two checkouts can grab the same INV-00000N between count() and create().
-        // The unique(tenant_id, number) index rejects the loser; retry the whole
-        // transaction so the count is recomputed and stock locks re-acquired.
-        for ($attempt = 0; $attempt < 5; $attempt++) {
-            try {
-                return $this->persistOrder($user, $data);
-            } catch (QueryException $e) {
-                if ($e->errorInfo[1] ?? null !== 1062) {
-                    throw $e;
-                }
-            }
-        }
-
-        abort(500, 'Unable to allocate an order number.');
-    }
-
-    private function persistOrder($user, array $data): Order
-    {
-        return DB::transaction(function () use ($user, $data) {
-            $productIds = collect($data['items'])->pluck('product_id')->unique()->all();
-            $products = Product::query()
-                ->lockForUpdate()
-                ->whereIn('id', $productIds)
-                ->get()
-                ->keyBy('id');
-
-            $subtotal = '0';
-            $items = [];
-
-            foreach ($data['items'] as $line) {
-                $product = $products->get($line['product_id']);
-                if (! $product) {
-                    abort(422, "Product {$line['product_id']} not found.");
-                }
-
-                $qty = (string) $line['quantity'];
-                if (bccomp($qty, '0') <= 0) {
-                    abort(422, 'Quantity must be greater than zero.');
-                }
-                if (bccomp($qty, (string) $product->quantity) > 0) {
-                    abort(422, "Insufficient stock for {$product->name}.");
-                }
-
-                // Price is floored at cost so the register can never sell at a loss.
-                $unitPrice = max($line['unit_price'], (float) $product->cost_price);
-                $lineTotal = bcmul($qty, (string) $unitPrice, 4);
-
-                $subtotal = bcadd($subtotal, $lineTotal, 4);
-
-                $items[] = [
-                    'product_id' => $product->id,
-                    'product_name' => $product->name,
-                    'barcode' => $product->barcode,
-                    'quantity' => $qty,
-                    'unit_price' => $unitPrice,
-                    'cost_price' => $product->cost_price,
-                    'line_total' => $lineTotal,
-                ];
-
-                $product->decrement('quantity', $qty);
-            }
-
-            $discount = (string) ($data['discount'] ?? 0);
-            $total = bcsub($subtotal, $discount, 4);
-            if (bccomp($total, '0') < 0) {
-                abort(422, 'Discount cannot exceed the subtotal.');
-            }
-
-            $paid = '0';
-            $payments = [];
-            foreach ($data['payments'] as $p) {
-                $amount = (string) $p['amount'];
-                if (bccomp($amount, '0') <= 0) {
-                    continue;
-                }
-                $paid = bcadd($paid, $amount, 4);
-                $payments[] = [
-                    'method' => $p['method'],
-                    'amount' => $amount,
-                ];
-            }
-
-            if (bccomp($paid, $total) < 0) {
-                abort(422, 'Tender does not cover the total.');
-            }
-
-            $change = bcsub($paid, $total, 4);
-
-            $number = $this->nextNumber($user->tenant_id);
-
-            $order = Order::create([
-                'tenant_id' => $user->tenant_id,
-                'branch_id' => $user->branch_id,
-                'device_id' => null,
-                'user_id' => $user->id,
-                'number' => $number,
-                'uuid' => $data['uuid'],
-                'subtotal' => $subtotal,
-                'discount' => $discount,
-                'total' => $total,
-                'amount_paid' => $paid,
-                'change' => $change,
-                'status' => OrderStatus::Completed->value,
-                'customer_id' => $data['customer_id'] ?? null,
-                'customer_name' => $data['customer_name'] ?? null,
-                'note' => $data['note'] ?? null,
+        DB::afterCommit(function () use ($order) {
+            SyncOutbox::create([
+                'tenant_id' => $order->tenant_id,
+                'kind' => 'void',
+                'order_uuid' => $order->uuid,
+                'payload' => ['uuid' => $order->uuid],
             ]);
-
-            $order->items()->createMany($items);
-            $order->payments()->createMany($payments);
-
-            return $order;
+            AuditLog::record('order.voided', $order);
         });
-    }
 
-    /**
-     * Per-tenant sequential invoice number (INV-000001). Concurrent checkouts
-     * can compute the same count; the unique index catches that and the caller
-     * retries the whole transaction.
-     */
-    private function nextNumber(int $tenantId): string
-    {
-        $count = Order::where('tenant_id', $tenantId)->count();
-
-        return 'INV-' . str_pad((string) ($count + 1), 6, '0', STR_PAD_LEFT);
+        return new OrderResource($order->load(['items', 'payments', 'customer', 'user', 'tenant', 'branch']));
     }
 
     private function validated(Request $request): array
     {
+        $user = $request->user();
+
         return $request->validate([
             'uuid' => ['required', 'uuid'],
             'items' => ['required', 'array', 'min:1'],
@@ -231,6 +139,16 @@ class OrderController extends Controller
             'customer_id' => ['nullable', 'integer', 'exists:customers,id'],
             'customer_name' => ['nullable', 'string', 'max:191'],
             'note' => ['nullable', 'string', 'max:191'],
+            // Device must belong to the same tenant — keeps a cashier from
+            // attributing sales to another tenant's till.
+            'device_id' => ['nullable', 'integer', function (string $attr, $value, $fail) use ($user) {
+                if ($value === null) {
+                    return;
+                }
+                if (! Device::where('id', $value)->where('tenant_id', $user->tenant_id)->exists()) {
+                    $fail('The selected device is invalid.');
+                }
+            }],
         ]);
     }
 }

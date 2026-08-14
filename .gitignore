@@ -20,6 +20,12 @@ backend/public/index.html
 backend/public/assets
 backend/public/build
 backend/public/favicon.*
+# PWA service-worker + manifest emitted by the frontend build (artifacts).
+backend/public/sw.js
+backend/public/workbox-*.js
+backend/public/manifest.webmanifest
+backend/public/registerSW.js
+backend/public/pwa-*.png
 backend/storage/app/*
 !backend/storage/app/.gitignore
 backend/storage/framework/*

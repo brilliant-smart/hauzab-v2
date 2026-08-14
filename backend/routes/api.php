@@ -2,18 +2,27 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductManufacturerController;
 use App\Http\Controllers\Api\ProductSupplierController;
 use App\Http\Controllers\Api\ProductUnitController;
+use App\Http\Controllers\Api\SyncController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // Public auth endpoints.
 Route::post('/auth/login', [AuthController::class, 'login']);
+
+// Cloud receive endpoints — machine-to-machine, guarded by X-Sync-Secret
+// rather than a cashier session, so they sit outside auth:sanctum.
+Route::middleware('sync')->prefix('sync')->group(function () {
+    Route::post('orders', [SyncController::class, 'storeOrder']);
+    Route::post('orders/{uuid}/void', [SyncController::class, 'voidOrder']);
+});
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
@@ -53,6 +62,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('product-suppliers', ProductSupplierController::class)->except(['index']);
 
         Route::apiResource('users', UserController::class);
+
+        // Device (till/tablet) administration.
+        Route::get('devices', [DeviceController::class, 'index']);
+        Route::post('devices', [DeviceController::class, 'store']);
 
         // Voiding a completed sale is a manager action.
         Route::post('orders/{order}/void', [OrderController::class, 'void']);

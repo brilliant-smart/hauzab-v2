@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Printer } from "lucide-react";
-import { Order } from "@/app/api/types";
+import { Order, ProvisionalOrder, ReceiptOrder, PaymentMethodValue } from "@/app/api/types";
 import { formatCurrency } from "@/app/lib/format";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,11 +34,84 @@ function money(value: string | number | null | undefined): string {
   return formatCurrency(value);
 }
 
+/** Normalized receipt shape so a server Order and an offline ProvisionalOrder
+ * render through one body. */
+interface ReceiptVM {
+  number: string;
+  isProvisional: boolean;
+  createdAt: string;
+  cashierName: string | null;
+  customerName: string | null;
+  tenant: {
+    name: string;
+    address?: string | null;
+    phone?: string | null;
+    email?: string | null;
+  } | null;
+  items: { name: string; qty: number; unitPrice: number; lineTotal: number }[];
+  subtotal: number;
+  discount: number;
+  total: number;
+  payments: { method: PaymentMethodValue; amount: number }[];
+  amountPaid: number;
+  change: number;
+  statusLabel: string;
+}
+
+function toVM(order: ReceiptOrder): ReceiptVM {
+  if (order.is_provisional) {
+    const p = order as ProvisionalOrder;
+    return {
+      number: p.provisional_number,
+      isProvisional: true,
+      createdAt: p.created_at,
+      cashierName: p.user?.name ?? null,
+      customerName: p.customer_name,
+      tenant: p.tenant ?? null,
+      items: p.items.map((i) => ({
+        name: i.product_name,
+        qty: i.quantity,
+        unitPrice: i.unit_price,
+        lineTotal: i.line_total,
+      })),
+      subtotal: p.subtotal,
+      discount: p.discount,
+      total: p.total,
+      payments: p.payments,
+      amountPaid: p.amount_paid,
+      change: p.change,
+      statusLabel: "Pending sync",
+    };
+  }
+  const o = order as Order;
+  return {
+    number: o.number,
+    isProvisional: false,
+    createdAt: o.created_at ?? new Date().toISOString(),
+    cashierName: o.user?.name ?? null,
+    customerName: o.customer_name,
+    tenant: o.tenant ?? null,
+    items: o.items.map((i) => ({
+      name: i.product_name,
+      qty: Number(i.quantity),
+      unitPrice: Number(i.unit_price),
+      lineTotal: Number(i.line_total),
+    })),
+    subtotal: Number(o.subtotal),
+    discount: Number(o.discount),
+    total: Number(o.total),
+    payments: o.payments.map((p) => ({ method: p.method.value, amount: Number(p.amount) })),
+    amountPaid: Number(o.amount_paid),
+    change: Number(o.change),
+    statusLabel: o.status.label,
+  };
+}
+
 /** Printable receipt body. Matches the old Hauzab thermal layout. */
-function ReceiptBody({ order, format }: { order: Order; format: ReceiptFormat }) {
+function ReceiptBody({ vm, format }: { vm: ReceiptVM; format: ReceiptFormat }) {
   const cfg = FORMAT_CONFIG[format];
-  const tenant = order.tenant;
-  const date = order.created_at ? new Date(order.created_at) : new Date();
+  const tenant = vm.tenant;
+  const date = vm.createdAt ? new Date(vm.createdAt) : new Date();
   const dateStr = date.toLocaleString("en-GB", {
     day: "2-digit",
     month: "short",
@@ -47,10 +120,10 @@ function ReceiptBody({ order, format }: { order: Order; format: ReceiptFormat })
     minute: "2-digit",
   });
 
-  const byMethod = (method: string) =>
-    order.payments
-      .filter((p) => p.method.value === method)
-      .reduce((s, p) => s + Number(p.amount), 0);
+  const byMethod = (method: PaymentMethodValue) =>
+    vm.payments
+      .filter((p) => p.method === method)
+      .reduce((s, p) => s + p.amount, 0);
 
   return (
     <div
@@ -82,7 +155,7 @@ function ReceiptBody({ order, format }: { order: Order; format: ReceiptFormat })
 
       <div style={{ display: "flex", justifyContent: "space-between" }}>
         <span>Order</span>
-        <span>{order.number}</span>
+        <span>{vm.number}</span>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between" }}>
         <span>Date</span>
@@ -90,12 +163,12 @@ function ReceiptBody({ order, format }: { order: Order; format: ReceiptFormat })
       </div>
       <div style={{ display: "flex", justifyContent: "space-between" }}>
         <span>Cashier</span>
-        <span>{order.user?.name ?? "—"}</span>
+        <span>{vm.cashierName ?? "—"}</span>
       </div>
-      {order.customer_name && (
+      {vm.customerName && (
         <div style={{ display: "flex", justifyContent: "space-between" }}>
           <span>Customer</span>
-          <span>{order.customer_name}</span>
+          <span>{vm.customerName}</span>
         </div>
       )}
 
@@ -109,15 +182,15 @@ function ReceiptBody({ order, format }: { order: Order; format: ReceiptFormat })
           </tr>
         </thead>
         <tbody>
-          {order.items.map((item) => (
-            <tr key={item.id} style={{ verticalAlign: "top" }}>
+          {vm.items.map((item, idx) => (
+            <tr key={idx} style={{ verticalAlign: "top" }}>
               <td>
-                <div>{item.product_name}</div>
+                <div>{item.name}</div>
                 <div style={{ opacity: 0.8 }}>
-                  {Number(item.quantity)} x {money(item.unit_price)}
+                  {item.qty} x {money(item.unitPrice)}
                 </div>
               </td>
-              <td style={{ textAlign: "right" }}>{money(item.line_total)}</td>
+              <td style={{ textAlign: "right" }}>{money(item.lineTotal)}</td>
             </tr>
           ))}
         </tbody>
@@ -127,12 +200,12 @@ function ReceiptBody({ order, format }: { order: Order; format: ReceiptFormat })
 
       <div style={{ display: "flex", justifyContent: "space-between" }}>
         <span>Subtotal</span>
-        <span>{money(order.subtotal)}</span>
+        <span>{money(vm.subtotal)}</span>
       </div>
-      {Number(order.discount) > 0 && (
+      {vm.discount > 0 && (
         <div style={{ display: "flex", justifyContent: "space-between" }}>
           <span>Discount</span>
-          <span>-{money(order.discount)}</span>
+          <span>-{money(vm.discount)}</span>
         </div>
       )}
       <div
@@ -147,7 +220,7 @@ function ReceiptBody({ order, format }: { order: Order; format: ReceiptFormat })
         }}
       >
         <span>Total</span>
-        <span>{money(order.total)}</span>
+        <span>{money(vm.total)}</span>
       </div>
 
       <hr style={{ borderStyle: "dashed", borderWidth: 1, margin: "6px 0" }} />
@@ -172,20 +245,33 @@ function ReceiptBody({ order, format }: { order: Order; format: ReceiptFormat })
       )}
       <div style={{ display: "flex", justifyContent: "space-between" }}>
         <span>Paid</span>
-        <span>{money(order.amount_paid)}</span>
+        <span>{money(vm.amountPaid)}</span>
       </div>
-      {Number(order.change) > 0 && (
+      {vm.change > 0 && (
         <div style={{ display: "flex", justifyContent: "space-between" }}>
           <span>Change</span>
-          <span>{money(order.change)}</span>
+          <span>{money(vm.change)}</span>
         </div>
       )}
 
       <hr style={{ borderStyle: "dashed", borderWidth: 1, margin: "6px 0" }} />
 
-      <div style={{ textAlign: "center", fontWeight: 700 }}>
-        {order.status.label.toUpperCase()}
-      </div>
+      {vm.isProvisional ? (
+        <div
+          style={{
+            textAlign: "center",
+            fontWeight: 700,
+            border: "1px dashed #000",
+            padding: "2px 0",
+          }}
+        >
+          PENDING SYNC
+        </div>
+      ) : (
+        <div style={{ textAlign: "center", fontWeight: 700 }}>
+          {vm.statusLabel.toUpperCase()}
+        </div>
+      )}
       <div style={{ textAlign: "center", marginTop: 6 }}>
         Thank you for your patronage
       </div>
@@ -194,7 +280,7 @@ function ReceiptBody({ order, format }: { order: Order; format: ReceiptFormat })
 }
 
 interface ReceiptDialogProps {
-  order: Order | null;
+  order: ReceiptOrder | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -202,6 +288,7 @@ interface ReceiptDialogProps {
 export function ReceiptDialog({ order, open, onOpenChange }: ReceiptDialogProps) {
   const [format, setFormat] = useState<ReceiptFormat>("80mm");
   const cfg = FORMAT_CONFIG[format];
+  const vm = order ? toVM(order) : null;
 
   const handlePrint = () => {
     const styleId = "receipt-print-style";
@@ -229,7 +316,14 @@ export function ReceiptDialog({ order, open, onOpenChange }: ReceiptDialogProps)
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Receipt · {order?.number}</DialogTitle>
+          <DialogTitle>
+            Receipt · {vm?.number}
+            {vm?.isProvisional && (
+              <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">
+                Pending sync
+              </span>
+            )}
+          </DialogTitle>
           <DialogDescription>
             Preview the receipt, choose a paper width, then print.
           </DialogDescription>
@@ -250,7 +344,7 @@ export function ReceiptDialog({ order, open, onOpenChange }: ReceiptDialogProps)
         </div>
 
         <div className="flex justify-center overflow-auto rounded-md bg-muted/40 p-4">
-          {order && <ReceiptBody order={order} format={format} />}
+          {vm && <ReceiptBody vm={vm} format={format} />}
         </div>
 
         <DialogFooter className="no-print">

@@ -9,10 +9,11 @@ class Device extends Model
 {
     // A till/tablet at a branch. Sales are attributed to a device so that
     // offline-first append-only writes never conflict across devices.
-    protected $fillable = ['tenant_id', 'branch_id', 'name', 'is_active'];
+    protected $fillable = ['tenant_id', 'branch_id', 'name', 'is_active', 'last_seen_at'];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'last_seen_at' => 'datetime',
     ];
 
     public function tenant(): BelongsTo

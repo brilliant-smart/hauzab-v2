@@ -1,15 +1,27 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { Minus, Plus, Search, Trash2, X } from "lucide-react";
+import { AxiosError } from "axios";
+import { Minus, Plus, Search, X } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useProducts } from "@/app/api/catalog";
 import { useCustomers } from "@/app/api/customers";
-import { useCreateOrder } from "@/app/api/orders";
-import { Product } from "@/app/api/types";
+import { orderKeys } from "@/app/api/orders";
+import {
+  Order,
+  PaymentMethodValue,
+  Product,
+  ProvisionalOrder,
+  ReceiptOrder,
+} from "@/app/api/types";
 import { api } from "@/app/lib/api";
+import { outboxApi, OutboxAuthError } from "@/app/lib/outboxApi";
 import { handleApiError } from "@/app/lib/errorHandler";
 import { formatCurrency } from "@/app/lib/format";
 import { useCart } from "@/app/pos/useCart";
 import { ReceiptDialog } from "@/app/pos/ReceiptDialog";
+import { useOutbox } from "@/app/offline/useOutbox";
+import { device } from "@/app/offline/device";
+import { useAuth } from "@/app/auth/AuthContext";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,7 +41,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Order, PaymentMethodValue } from "@/app/api/types";
 
 const TENDER_METHODS: { value: PaymentMethodValue; label: string }[] = [
   { value: "cash", label: "Cash" },
@@ -48,16 +59,19 @@ function newUuid(): string {
 }
 
 export default function MakeSale() {
+  const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [scan, setScan] = useState("");
   const [customerId, setCustomerId] = useState<string>("");
   const [discount, setDiscount] = useState(0);
   const [paymentOpen, setPaymentOpen] = useState(false);
-  const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
+  const [receiptOrder, setReceiptOrder] = useState<ReceiptOrder | null>(null);
   const [receiptOpen, setReceiptOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const cart = useCart();
-  const createOrder = useCreateOrder();
+  const outbox = useOutbox();
+  const qc = useQueryClient();
   const { data: productsData, isLoading } = useProducts({ search, per_page: 25 });
   const { data: customersData } = useCustomers({ per_page: 50 });
 
@@ -88,7 +102,49 @@ export default function MakeSale() {
 
   const total = Math.max(0, cart.subtotal - discount);
 
-  const completeSale = (tender: Record<PaymentMethodValue, number>) => {
+  const resetCart = () => {
+    cart.clear();
+    setDiscount(0);
+    setCustomerId("");
+    setPaymentOpen(false);
+  };
+
+  const buildProvisional = (
+    uuid: string,
+    payments: { method: PaymentMethodValue; amount: number }[],
+  ): ProvisionalOrder => ({
+    is_provisional: true,
+    uuid,
+    provisional_number: "OFFLINE-" + uuid.slice(0, 8).toUpperCase(),
+    subtotal: cart.subtotal,
+    discount,
+    total,
+    amount_paid: payments.reduce((s, p) => s + p.amount, 0),
+    change: Math.max(0, payments.reduce((s, p) => s + p.amount, 0) - total),
+    customer_name: customerId
+      ? customersData?.data.find((c) => String(c.id) === customerId)?.name ?? null
+      : null,
+    items: cart.items.map((l) => ({
+      product_name: l.name,
+      quantity: l.qty,
+      unit_price: l.price,
+      line_total: l.qty * l.price,
+    })),
+    payments,
+    tenant: user?.tenant
+      ? {
+          id: user.tenant.id,
+          name: user.tenant.name,
+          address: null,
+          phone: null,
+          email: null,
+        }
+      : null,
+    user: user ? { id: user.id, name: user.name } : null,
+    created_at: new Date().toISOString(),
+  });
+
+  const completeSale = async (tender: Record<PaymentMethodValue, number>) => {
     const payments = TENDER_METHODS.map((m) => ({
       method: m.value,
       amount: Math.max(0, tender[m.value] || 0),
@@ -99,8 +155,12 @@ export default function MakeSale() {
       return;
     }
 
+    // One uuid for the sale's lifetime. Persisted to the outbox BEFORE any
+    // network call so a lost response + retry reuses it and the server's
+    // duplicate path returns the original order (no double stock charge).
+    const uuid = newUuid();
     const payload = {
-      uuid: newUuid(),
+      uuid,
       items: cart.items.map((l) => ({
         product_id: l.productId,
         quantity: l.qty,
@@ -109,20 +169,81 @@ export default function MakeSale() {
       discount,
       payments,
       customer_id: customerId ? Number(customerId) : null,
+      device_id: device.get(),
     };
 
-    createOrder.mutate(payload, {
-      onSuccess: (order) => {
-        toast.success(`Sale completed · ${order.number}`);
-        cart.clear();
-        setDiscount(0);
-        setCustomerId("");
-        setPaymentOpen(false);
-        setReceiptOrder(order);
+    try {
+      await outbox.add({
+        uuid,
+        payload,
+        status: "pending",
+        created_at: Date.now(),
+      });
+    } catch {
+      // IndexedDB unavailable (private mode / storage disabled) — don't lose
+      // the sale silently; keep the cart so the cashier can retry online.
+      toast.error("Offline storage unavailable — reconnect to record this sale");
+      return;
+    }
+
+    setSubmitting(true);
+
+    // Offline: skip the network entirely and hand back a provisional receipt.
+    // The SyncManager drains the outbox row when connectivity returns.
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setSubmitting(false);
+      resetCart();
+      setReceiptOrder(buildProvisional(uuid, payments));
+      setReceiptOpen(true);
+      toast.success("Sale recorded offline · pending sync");
+      return;
+    }
+
+    try {
+      const res = await outboxApi.post<{ data: Order }>("orders", payload);
+      const order = res.data.data;
+      await outbox.markSynced(uuid, { server_id: order.id, server_number: order.number });
+      qc.invalidateQueries({ queryKey: orderKeys.all });
+      qc.invalidateQueries({ queryKey: ["products"] });
+      resetCart();
+      setReceiptOrder(order);
+      setReceiptOpen(true);
+      toast.success(`Sale completed · ${order.number}`);
+    } catch (err) {
+      if (err instanceof OutboxAuthError) {
+        // Session expired — can't complete online and can't sync. Drop the
+        // queued row so it doesn't loop on a dead token; keep the cart.
+        await outbox.remove(uuid).catch(() => {});
+        toast.error("Your session expired — log in again to complete the sale");
+      } else if (err instanceof AxiosError && err.response) {
+        const status = err.response.status;
+        if (status === 422) {
+          // Real validation error (insufficient stock, bad input) — drop the
+          // row and surface the error; cart stays so the cashier can fix it.
+          await outbox.remove(uuid).catch(() => {});
+          handleApiError(err);
+        } else if (status >= 500) {
+          // Server fault mid-POST — treat as offline-success: provisional
+          // receipt now, the outbox row drains when the server recovers.
+          resetCart();
+          setReceiptOrder(buildProvisional(uuid, payments));
+          setReceiptOpen(true);
+          toast.success("Sale recorded offline · pending sync");
+        } else {
+          await outbox.remove(uuid).catch(() => {});
+          handleApiError(err);
+        }
+      } else {
+        // Network error mid-POST (response lost) — the sale is safely queued;
+        // hand back a provisional receipt and let the drainer finish it.
+        resetCart();
+        setReceiptOrder(buildProvisional(uuid, payments));
         setReceiptOpen(true);
-      },
-      onError: (err) => handleApiError(err),
-    });
+        toast.success("Sale recorded offline · pending sync");
+      }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -333,7 +454,7 @@ export default function MakeSale() {
         open={paymentOpen}
         onOpenChange={setPaymentOpen}
         total={total}
-        loading={createOrder.isPending}
+        loading={submitting}
         onComplete={completeSale}
       />
 

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
+use App\Models\Device;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,6 +22,7 @@ class AuthController extends Controller
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
             'device_name' => ['nullable', 'string', 'max:120'],
+            'device_id' => ['nullable', 'integer'],
         ]);
 
         if (! Auth::attempt($request->only('email', 'password'))) {
@@ -37,12 +40,22 @@ class AuthController extends Controller
             ]);
         }
 
+        // Stamp the till's last-seen so admins can spot dormant devices. The
+        // device must belong to the same tenant — a wrong tenant id is ignored
+        // rather than failing the login.
+        $deviceId = $request->integer('device_id');
+        if ($deviceId && Device::where('id', $deviceId)->where('tenant_id', $user->tenant_id)->exists()) {
+            Device::where('id', $deviceId)->update(['last_seen_at' => now()]);
+        }
+
         // Single active session per user.
         $user->tokens()->delete();
 
         $token = $user->createToken(
             $request->input('device_name', 'api-token')
         );
+
+        AuditLog::record('auth.login', $user);
 
         return response()->json([
             'token' => $token->plainTextToken,
@@ -52,7 +65,10 @@ class AuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
-        $request->user()?->currentAccessToken()?->delete();
+        $user = $request->user();
+        $user?->currentAccessToken()?->delete();
+
+        AuditLog::record('auth.logout', $user);
 
         return response()->json(['message' => 'Logged out']);
     }

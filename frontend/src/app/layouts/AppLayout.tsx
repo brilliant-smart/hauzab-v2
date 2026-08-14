@@ -10,11 +10,15 @@ import {
   Receipt,
   ShoppingCart,
   Users,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import { useAuth } from "@/app/auth/AuthContext";
 import { isAtLeast } from "@/app/auth/guards";
+import { useSync } from "@/app/offline/SyncManager";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
   Collapsible,
@@ -157,6 +161,39 @@ function UserMenu() {
   );
 }
 
+function SyncStatus() {
+  const { online, pendingCount, draining } = useSync();
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium",
+        online
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+          : "border-amber-200 bg-amber-50 text-amber-700",
+      )}
+      title={
+        online
+          ? draining
+            ? "Syncing pending sales…"
+            : "Online"
+          : "Offline — sales are queued and will sync on reconnect"
+      }
+    >
+      {online ? <Wifi className="size-3.5" /> : <WifiOff className="size-3.5" />}
+      <span>{online ? "Online" : "Offline"}</span>
+      {pendingCount > 0 && (
+        <Badge
+          variant="secondary"
+          className="ml-1 h-4 px-1.5 text-[10px] leading-none"
+        >
+          {pendingCount}
+        </Badge>
+      )}
+    </div>
+  );
+}
+
 export default function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -195,7 +232,10 @@ export default function AppLayout() {
               <span className="text-lg font-semibold">Hauzab</span>
             </div>
             <div className="hidden md:block" />
-            <UserMenu />
+            <div className="flex items-center gap-3">
+              <SyncStatus />
+              <UserMenu />
+            </div>
           </header>
 
           <main className="flex-1 p-4 md:p-6">

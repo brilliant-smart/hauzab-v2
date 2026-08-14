@@ -13,6 +13,7 @@ class OrderResource extends JsonResource
             'id' => $this->id,
             'number' => $this->number,
             'uuid' => $this->uuid,
+            'device_id' => $this->device_id,
             'status' => [
                 'value' => $this->status?->value,
                 'label' => $this->status?->label(),

@@ -115,6 +115,9 @@ export interface OrderPayment {
 
 export interface Order {
   id: number;
+  // Discriminant for ReceiptOrder = Order | ProvisionalOrder. Always absent on
+  // a real server order; present (true) only on the offline provisional shape.
+  is_provisional?: false;
   number: string;
   uuid: string;
   status: { value: OrderStatusValue; label: string };
@@ -149,7 +152,40 @@ export interface CreateOrderPayload {
   customer_id?: number | null;
   customer_name?: string | null;
   note?: string | null;
+  device_id?: number | null;
 }
+
+/**
+ * A sale recorded in the browser while offline (or mid-flight network loss).
+ * Mirrors the money shape of a server Order so the receipt and history views
+ * can render either through one view-model. The uuid is the dedup key: when the
+ * outbox drains, the server returns the real order for that uuid and the
+ * provisional row is dropped.
+ */
+export interface ProvisionalOrder {
+  is_provisional: true;
+  uuid: string;
+  provisional_number: string;
+  subtotal: number;
+  discount: number;
+  total: number;
+  amount_paid: number;
+  change: number;
+  customer_name: string | null;
+  items: { product_name: string; quantity: number; unit_price: number; line_total: number }[];
+  payments: { method: PaymentMethodValue; amount: number }[];
+  tenant?: {
+    id: number;
+    name: string;
+    address?: string | null;
+    phone?: string | null;
+    email?: string | null;
+  } | null;
+  user?: { id: number; name: string } | null;
+  created_at: string;
+}
+
+export type ReceiptOrder = Order | ProvisionalOrder;
 
 export const ROLE_OPTIONS: { value: Role; label: string }[] = [
   { value: "admin", label: "Admin" },
