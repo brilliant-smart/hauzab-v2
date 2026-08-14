@@ -6,13 +6,17 @@ import {
   PackagePlus,
   Receipt,
   ShoppingCart,
+  TrendingUp,
   Users,
+  Wallet,
 } from "lucide-react";
 import { useAuth } from "@/app/auth/AuthContext";
 import { isAtLeast } from "@/app/auth/guards";
 import { useExpiring, useLowStock, useProducts } from "@/app/api/catalog";
+import { useDashboardSummary } from "@/app/api/dashboard";
 import { useEmployees } from "@/app/api/employees";
 import { useOrders } from "@/app/api/orders";
+import { formatCurrency } from "@/app/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -56,9 +60,40 @@ function ManagerDashboard() {
   const lowStock = useLowStock({ per_page: 1 });
   const expiring = useExpiring({ per_page: 1 });
   const employees = useEmployees({ per_page: 1 });
+  const summary = useDashboardSummary();
 
   return (
     <>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Today's Sales"
+          value={formatCurrency(summary.data?.today.total ?? 0)}
+          icon={TrendingUp}
+          hint={`${summary.data?.today.count ?? 0} sales`}
+          to="/reports/sales"
+        />
+        <StatCard
+          title="This Week"
+          value={formatCurrency(summary.data?.week.total ?? 0)}
+          icon={Receipt}
+          hint={`${summary.data?.week.count ?? 0} sales`}
+          to="/reports/sales"
+        />
+        <StatCard
+          title="This Year"
+          value={formatCurrency(summary.data?.year.total ?? 0)}
+          icon={ShoppingCart}
+          hint={`${summary.data?.year.count ?? 0} sales`}
+          to="/reports/sales"
+        />
+        <StatCard
+          title="Monthly Expense"
+          value={formatCurrency(summary.data?.monthly_expense ?? 0)}
+          icon={Wallet}
+          to="/expenses"
+        />
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Products" value={products.data?.total ?? 0} icon={Boxes} to="/products" />
         <StatCard

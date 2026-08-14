@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 export interface Column<T> {
   key: string;
   header: string;
-  cell: (row: T) => ReactNode;
+  cell: (row: T, index: number) => ReactNode;
   className?: string;
 }
 
@@ -64,11 +64,11 @@ export function DataTable<T>({
                 </TableCell>
               </TableRow>
             ) : (
-              data.map((row) => (
+              data.map((row, index) => (
                 <TableRow key={rowKey(row)}>
                   {columns.map((col) => (
                     <TableCell key={col.key} className={col.className}>
-                      {col.cell(row)}
+                      {col.cell(row, index)}
                     </TableCell>
                   ))}
                 </TableRow>

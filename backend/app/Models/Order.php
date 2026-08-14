@@ -15,9 +15,10 @@ class Order extends Model
 
     protected $fillable = [
         'tenant_id', 'branch_id', 'device_id', 'user_id',
-        'number', 'uuid',
+        'number', 'uuid', 'legacy_number',
         'subtotal', 'discount', 'total', 'amount_paid', 'change',
-        'status', 'customer_id', 'customer_name', 'note',
+        'status', 'customer_id', 'customer_name', 'customer_phone', 'note',
+        'legacy_meta',
     ];
 
     protected $casts = [
@@ -27,6 +28,7 @@ class Order extends Model
         'amount_paid' => 'decimal:4',
         'change' => 'decimal:4',
         'status' => OrderStatus::class,
+        'legacy_meta' => 'array',
     ];
 
     public function tenant(): BelongsTo

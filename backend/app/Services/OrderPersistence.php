@@ -6,6 +6,7 @@ use App\Enums\OrderStatus;
 use App\Models\Order;
 use App\Models\Product;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -15,6 +16,11 @@ use Illuminate\Support\Facades\DB;
  */
 class OrderPersistence
 {
+    public function __construct(
+        private readonly StockLedger $ledger,
+    ) {
+    }
+
     /**
      * Create an order from already-validated data. Idempotent on uuid at the
      * caller's boundary (OrderController and SyncController both short-circuit
@@ -80,6 +86,10 @@ class OrderPersistence
                     'cost_price' => $product->cost_price,
                     'line_total' => $lineTotal,
                 ];
+
+                // Write the ledger line before the stock decrement so the
+                // card's opening captures pre-sale stock.
+                $this->ledger->applySaleLine($tenantId, $product->id, $qty, $userId, Carbon::now());
 
                 $product->decrement('quantity', $qty);
             }

@@ -23,6 +23,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // Drain the campus outbox to the cloud once a minute. Cron entry:
         // * * * * * cd /path/backend && php artisan schedule:run >> /dev/null 2>&1
         $schedule->command('sync:push')->everyMinute()->withoutOverlapping();
+
+        // Open today's stock ledger cards just after midnight so the Sales
+        // Audit report has an accurate start-of-day opening for every product.
+        $schedule->command('product-cards:seed-today')->dailyAt('00:01')->withoutOverlapping();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

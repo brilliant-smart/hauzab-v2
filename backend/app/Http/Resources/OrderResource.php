@@ -12,6 +12,7 @@ class OrderResource extends JsonResource
         return [
             'id' => $this->id,
             'number' => $this->number,
+            'legacy_number' => $this->legacy_number,
             'uuid' => $this->uuid,
             'device_id' => $this->device_id,
             'status' => [
@@ -25,6 +26,7 @@ class OrderResource extends JsonResource
             'change' => $this->change,
             'customer_id' => $this->customer_id,
             'customer_name' => $this->customer_name,
+            'customer_phone' => $this->customer_phone,
             'note' => $this->note,
             'items' => $this->whenLoaded('items', fn () => $this->items->map(fn ($i) => [
                 'id' => $i->id,

@@ -2,27 +2,28 @@
 
 namespace App\Models;
 
-use App\Enums\PaymentMethod;
+use App\Traits\BelongsToTenant;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Payment extends Model
+class Expense extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToTenant;
 
     protected $fillable = [
-        'order_id', 'method', 'amount', 'kind', 'user_id', 'legacy_id',
+        'tenant_id', 'expense_category_id', 'user_id',
+        'description', 'amount', 'date', 'legacy_id',
     ];
 
     protected $casts = [
-        'method' => PaymentMethod::class,
         'amount' => 'decimal:4',
+        'date' => 'date',
     ];
 
-    public function order(): BelongsTo
+    public function category(): BelongsTo
     {
-        return $this->belongsTo(Order::class);
+        return $this->belongsTo(ExpenseCategory::class, 'expense_category_id');
     }
 
     public function user(): BelongsTo

@@ -2,19 +2,24 @@ import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
+  BarChart3,
   Boxes,
   ChevronDown,
   LayoutDashboard,
   LogOut,
   Menu,
+  Package,
   Receipt,
+  ScrollText,
   ShoppingCart,
   Users,
+  Wallet,
   Wifi,
   WifiOff,
 } from "lucide-react";
 import { useAuth } from "@/app/auth/AuthContext";
 import { isAtLeast } from "@/app/auth/guards";
+import { Role } from "@/app/auth/types";
 import { useSync } from "@/app/offline/SyncManager";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -30,6 +35,7 @@ interface NavLeaf {
   to: string;
   label: string;
   end?: boolean;
+  roles?: Role[];
 }
 
 interface NavItem {
@@ -38,6 +44,7 @@ interface NavItem {
   icon: typeof LayoutDashboard;
   children?: NavLeaf[];
   end?: boolean;
+  roles?: Role[];
 }
 
 const PRODUCTS_CHILDREN: NavLeaf[] = [
@@ -51,6 +58,18 @@ const PRODUCTS_CHILDREN: NavLeaf[] = [
   { to: "/units", label: "Product Unit" },
 ];
 
+const EXPENSE_CHILDREN: NavLeaf[] = [
+  { to: "/expense-categories", label: "Expense Category" },
+  { to: "/expenses", label: "Expense List" },
+];
+
+const REPORTS_CHILDREN: NavLeaf[] = [
+  { to: "/reports/sales", label: "Sales Report" },
+  { to: "/pos/history", label: "Sales History" },
+  { to: "/reports/sales-audit", label: "Sales Audit" },
+  { to: "/reports/staff-sales", label: "Staff Sales", roles: ["admin"] },
+];
+
 const MANAGER_NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, end: true },
   {
@@ -59,6 +78,18 @@ const MANAGER_NAV: NavItem[] = [
     children: PRODUCTS_CHILDREN,
   },
   { to: "/employees", label: "Employee Record", icon: Users },
+  {
+    label: "Expenses",
+    icon: Wallet,
+    children: EXPENSE_CHILDREN,
+  },
+  {
+    label: "Reports",
+    icon: BarChart3,
+    children: REPORTS_CHILDREN,
+  },
+  { to: "/consignments", label: "Product Consignment", icon: Package },
+  { to: "/audit-logs", label: "Activity Log", icon: ScrollText },
 ];
 
 const POS_NAV: NavItem[] = [
@@ -67,7 +98,20 @@ const POS_NAV: NavItem[] = [
 ];
 
 function NavRow({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }) {
+  const { user } = useAuth();
+  const role = user?.role;
+
+  if (item.roles && (!role || !item.roles.includes(role))) {
+    return null;
+  }
+
   if (item.children) {
+    const children = item.children.filter(
+      (child) => !child.roles || (role && child.roles.includes(role)),
+    );
+    if (children.length === 0) {
+      return null;
+    }
     return (
       <Collapsible>
         <CollapsibleTrigger className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
@@ -76,7 +120,7 @@ function NavRow({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }
           <ChevronDown className="size-4 transition-transform [[data-state=open]>&]:rotate-180" />
         </CollapsibleTrigger>
         <CollapsibleContent className="ml-4 border-l pl-2">
-          {item.children.map((child) => (
+          {children.map((child) => (
             <NavLink
               key={child.to}
               to={child.to}

@@ -1,14 +1,20 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AuditLogController;
+use App\Http\Controllers\Api\ConsignmentController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DeviceController;
+use App\Http\Controllers\Api\ExpenseCategoryController;
+use App\Http\Controllers\Api\ExpenseController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ProductCategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\ProductManufacturerController;
 use App\Http\Controllers\Api\ProductSupplierController;
 use App\Http\Controllers\Api\ProductUnitController;
+use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\SyncController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Http\Request;
@@ -69,5 +75,27 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Voiding a completed sale is a manager action.
         Route::post('orders/{order}/void', [OrderController::class, 'void']);
+
+        // Reports, dashboard, consignments, audit log, and expenses.
+        // Permission mirrors the old app's inverted supervisor/manager helpers:
+        // managers (admin|supervisor) view; old "supervisor-only" actions
+        // (export, staff sales, expense edit/delete) are admin-only.
+        Route::get('dashboard/summary', [DashboardController::class, 'summary']);
+
+        Route::get('reports/sales', [ReportController::class, 'sales']);
+        Route::get('reports/sales-audit', [ReportController::class, 'salesAudit']);
+
+        Route::apiResource('consignments', ConsignmentController::class);
+        Route::apiResource('audit-logs', AuditLogController::class)->only(['index']);
+
+        Route::apiResource('expense-categories', ExpenseCategoryController::class)->only(['index', 'show']);
+        Route::apiResource('expenses', ExpenseController::class)->only(['index', 'show']);
+
+        Route::middleware('role:admin')->group(function () {
+            Route::get('reports/sales-audit/export', [ReportController::class, 'salesAuditExport']);
+            Route::get('reports/staff-sales', [ReportController::class, 'staffSales']);
+            Route::apiResource('expense-categories', ExpenseCategoryController::class)->except(['index', 'show']);
+            Route::apiResource('expenses', ExpenseController::class)->except(['index', 'show']);
+        });
     });
 });

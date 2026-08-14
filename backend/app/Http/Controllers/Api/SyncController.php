@@ -9,6 +9,7 @@ use App\Models\AuditLog;
 use App\Models\Order;
 use App\Models\Product;
 use App\Services\OrderPersistence;
+use App\Services\StockLedger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -23,6 +24,7 @@ class SyncController extends Controller
 {
     public function __construct(
         private readonly OrderPersistence $persistence,
+        private readonly StockLedger $ledger,
     ) {
     }
 
@@ -127,6 +129,8 @@ class SyncController extends Controller
                         ->increment('quantity', $item->quantity);
                 }
             }
+
+            $this->ledger->recordVoid($order);
 
             $order->update(['status' => OrderStatus::Voided->value]);
         });

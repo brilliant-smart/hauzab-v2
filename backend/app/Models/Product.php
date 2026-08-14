@@ -15,7 +15,7 @@ class Product extends Model
         'name', 'description', 'size', 'model', 'department',
         'category_id', 'unit_id', 'manufacturer_id', 'supplier_id',
         'quantity', 'cost_price', 'selling_price', 'reorder_level',
-        'barcode', 'image', 'manufacture_date', 'expire_date',
+        'barcode', 'legacy_pid', 'image', 'manufacture_date', 'expire_date',
         'is_active', 'tenant_id',
     ];
 

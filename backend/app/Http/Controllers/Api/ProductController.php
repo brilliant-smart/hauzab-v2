@@ -5,11 +5,17 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ProductResource;
 use App\Models\Product;
+use App\Services\StockLedger;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class ProductController extends Controller
 {
+    public function __construct(
+        private readonly StockLedger $ledger,
+    ) {
+    }
     public function index(Request $request)
     {
         $products = Product::query()
@@ -34,8 +40,16 @@ class ProductController extends Controller
     {
         $data = $this->validated($request);
         $data['tenant_id'] = $request->user()->tenant_id;
+        $user = $request->user();
 
-        $product = Product::create($data);
+        $product = DB::transaction(function () use ($data, $user) {
+            $product = Product::create($data);
+
+            // Open today's card with the initial stock as opening (no added).
+            $this->ledger->seedDay($user->tenant_id, $product->id, $user->id, now());
+
+            return $product;
+        });
 
         return (new ProductResource($product->load(['category', 'unit', 'manufacturer', 'supplier'])))
             ->response()
@@ -49,7 +63,25 @@ class ProductController extends Controller
 
     public function update(Request $request, Product $product)
     {
-        $product->update($this->validated($request, $product));
+        $data = $this->validated($request, $product);
+        $user = $request->user();
+        $oldQty = (string) $product->quantity;
+        $newQty = (string) ($data['quantity'] ?? $oldQty);
+
+        DB::transaction(function () use ($product, $data, $user, $oldQty, $newQty) {
+            // A stock increase is a restock: record the delta as added before
+            // applying the new quantity so the card's opening is the old stock.
+            if (bccomp($newQty, $oldQty) > 0) {
+                $this->ledger->recordRestock(
+                    $product->tenant_id,
+                    $product->id,
+                    bcsub($newQty, $oldQty, 4),
+                    $user->id,
+                );
+            }
+
+            $product->update($data);
+        });
 
         return new ProductResource($product->load(['category', 'unit', 'manufacturer', 'supplier']));
     }

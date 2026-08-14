@@ -13,6 +13,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\SyncOutbox;
 use App\Services\OrderPersistence;
+use App\Services\StockLedger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -21,6 +22,7 @@ class OrderController extends Controller
 {
     public function __construct(
         private readonly OrderPersistence $persistence,
+        private readonly StockLedger $ledger,
     ) {
     }
 
@@ -105,6 +107,8 @@ class OrderController extends Controller
                         ->increment('quantity', $item->quantity);
                 }
             }
+
+            $this->ledger->recordVoid($order);
 
             $order->update(['status' => OrderStatus::Voided->value]);
         });

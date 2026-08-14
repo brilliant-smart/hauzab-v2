@@ -20,6 +20,14 @@ import EmployeeForm from "@/app/pages/employees/EmployeeForm";
 import MakeSale from "@/app/pages/pos/MakeSale";
 import SalesHistory from "@/app/pages/pos/SalesHistory";
 import SaleDetail from "@/app/pages/pos/SaleDetail";
+import ExpenseCategories from "@/app/pages/expenses/ExpenseCategories";
+import ExpenseList from "@/app/pages/expenses/ExpenseList";
+import SalesReport from "@/app/pages/reports/SalesReport";
+import SalesAudit from "@/app/pages/reports/SalesAudit";
+import StaffSales from "@/app/pages/reports/StaffSales";
+import ConsignmentList from "@/app/pages/consignments/ConsignmentList";
+import ConsignmentForm from "@/app/pages/consignments/ConsignmentForm";
+import ActivityLog from "@/app/pages/audit/ActivityLog";
 
 const MANAGER_ROLES = ["admin", "supervisor"] as const;
 
@@ -138,6 +146,86 @@ export default function AppRoutes() {
           element={
             <RoleProtectedRoute allowedRoles={[...MANAGER_ROLES]}>
               <EmployeeForm />
+            </RoleProtectedRoute>
+          }
+        />
+
+        {/* Expenses — admin|supervisor */}
+        <Route
+          path="/expense-categories"
+          element={
+            <RoleProtectedRoute allowedRoles={[...MANAGER_ROLES]}>
+              <ExpenseCategories />
+            </RoleProtectedRoute>
+          }
+        />
+        <Route
+          path="/expenses"
+          element={
+            <RoleProtectedRoute allowedRoles={[...MANAGER_ROLES]}>
+              <ExpenseList />
+            </RoleProtectedRoute>
+          }
+        />
+
+        {/* Reports — admin|supervisor (staff-sales admin only) */}
+        <Route
+          path="/reports/sales"
+          element={
+            <RoleProtectedRoute allowedRoles={[...MANAGER_ROLES]}>
+              <SalesReport />
+            </RoleProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports/sales-audit"
+          element={
+            <RoleProtectedRoute allowedRoles={[...MANAGER_ROLES]}>
+              <SalesAudit />
+            </RoleProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports/staff-sales"
+          element={
+            <RoleProtectedRoute allowedRoles={["admin"]}>
+              <StaffSales />
+            </RoleProtectedRoute>
+          }
+        />
+
+        {/* Consignments — admin|supervisor */}
+        <Route
+          path="/consignments"
+          element={
+            <RoleProtectedRoute allowedRoles={[...MANAGER_ROLES]}>
+              <ConsignmentList />
+            </RoleProtectedRoute>
+          }
+        />
+        <Route
+          path="/consignments/new"
+          element={
+            <RoleProtectedRoute allowedRoles={[...MANAGER_ROLES]}>
+              <ConsignmentForm />
+            </RoleProtectedRoute>
+          }
+        />
+        <Route
+          path="/consignments/:id/edit"
+          element={
+            <RoleProtectedRoute allowedRoles={[...MANAGER_ROLES]}>
+              <ConsignmentForm />
+            </RoleProtectedRoute>
+          }
+        />
+
+        {/* Activity log — admin|supervisor */}
+        <Route
+          path="/audit-logs"
+          element={
+            <RoleProtectedRoute allowedRoles={[...MANAGER_ROLES]}>
+              <ActivityLog />
             </RoleProtectedRoute>
           }
         />
