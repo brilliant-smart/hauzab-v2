@@ -5,6 +5,13 @@ import { PageHeader } from "@/components/PageHeader";
 import { DataTable, Column } from "@/components/DataTable";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { AuditLogEntry } from "@/app/api/types";
 
 const ACTIONS = [
@@ -36,7 +43,7 @@ export default function ActivityLog() {
   const [search, setSearch] = useState("");
   const [action, setAction] = useState("");
   const [page, setPage] = useState(1);
-  const { data, isLoading, isFetching } = useAuditLogs({
+  const { data, isLoading, isFetching, isError, refetch } = useAuditLogs({
     search: search || undefined,
     action: action || undefined,
     page,
@@ -71,8 +78,9 @@ export default function ActivityLog() {
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1.5">
-          <label className="text-sm font-medium">Search</label>
+          <label htmlFor="audit-search" className="text-sm font-medium">Search</label>
           <Input
+            id="audit-search"
             placeholder="Action, subject or user…"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
@@ -80,17 +88,21 @@ export default function ActivityLog() {
           />
         </div>
         <div className="space-y-1.5">
-          <label className="text-sm font-medium">Action</label>
-          <select
-            className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+          <label htmlFor="audit-action" className="text-sm font-medium">Action</label>
+          <Select
             value={action || NONE}
-            onChange={(e) => { setAction(e.target.value === NONE ? "" : e.target.value); setPage(1); }}
+            onValueChange={(v) => { setAction(v === NONE ? "" : v); setPage(1); }}
           >
-            <option value={NONE}>All actions</option>
-            {ACTIONS.map((a) => (
-              <option key={a} value={a}>{a}</option>
-            ))}
-          </select>
+            <SelectTrigger id="audit-action" className="w-[200px]">
+              <SelectValue placeholder="All actions" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>All actions</SelectItem>
+              {ACTIONS.map((a) => (
+                <SelectItem key={a} value={a}>{a}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -98,6 +110,8 @@ export default function ActivityLog() {
         columns={columns}
         data={data?.data ?? []}
         loading={isLoading || isFetching}
+        error={isError}
+        onRetry={() => refetch()}
         rowKey={(r) => r.id}
         page={data?.current_page}
         lastPage={data?.last_page}

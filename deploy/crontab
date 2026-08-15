@@ -1,0 +1,12 @@
+# Hauzab v2 — scheduler crontab for the web user (e.g. www-data or the deploy user).
+# Install with: crontab -u www-data deploy/crontab  (or `crontab deploy/crontab`
+# as the owning user). One system cron entry drives every scheduled task
+# defined in backend/bootstrap/app.php (sync:push every minute, the daily
+# product-cards:seed-today, etc.).
+#
+# Adjust the path to your install and the PHP binary.
+
+* * * * * cd /var/www/hauzab/backend && /usr/bin/php8.4 artisan schedule:run >> /dev/null 2>&1
+
+# Daily database backup (see deploy/backup.sh).
+0 2 * * * cd /var/www/hauzab/backend && /var/www/hauzab/deploy/backup.sh >> /dev/null 2>&1

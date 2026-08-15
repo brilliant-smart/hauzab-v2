@@ -11,7 +11,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 export default function StaffSales() {
   const [from, setFrom] = useState(today());
   const [to, setTo] = useState(today());
-  const { data, isLoading } = useStaffSales({ from, to });
+  const { data, isLoading, isError, refetch } = useStaffSales({ from, to });
 
   const rows = data ?? [];
   const grandTotal = rows.reduce((sum, r) => sum + Number(r.total), 0);
@@ -42,6 +42,8 @@ export default function StaffSales() {
         columns={columns}
         data={rows}
         loading={isLoading}
+        error={isError}
+        onRetry={() => refetch()}
         rowKey={(r) => r.user_id}
         emptyMessage="No sales in this range."
       />

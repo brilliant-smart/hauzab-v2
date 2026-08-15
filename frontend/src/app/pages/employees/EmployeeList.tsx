@@ -21,7 +21,7 @@ const ROLE_LABEL: Record<Employee["role"], string> = {
 export default function EmployeeList() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const { data, isLoading, isFetching } = useEmployees({ search, page });
+  const { data, isLoading, isFetching, isError, refetch } = useEmployees({ search, page });
   const deleteMutation = useDeleteEmployee();
 
   const handleDelete = (emp: Employee) => {
@@ -54,7 +54,7 @@ export default function EmployeeList() {
       key: "status",
       header: "Status",
       cell: (e) =>
-        e.is_active ? <Badge>Active</Badge> : <Badge variant="outline">Disabled</Badge>,
+        e.is_active ? <Badge variant="secondary">Active</Badge> : <Badge variant="outline">Disabled</Badge>,
     },
     {
       key: "actions",
@@ -106,6 +106,8 @@ export default function EmployeeList() {
         columns={columns}
         data={data?.data ?? []}
         loading={isLoading || isFetching}
+        error={isError}
+        onRetry={() => refetch()}
         rowKey={(e) => e.id}
         page={data?.current_page}
         lastPage={data?.last_page}

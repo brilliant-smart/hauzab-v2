@@ -11,6 +11,7 @@ import { DataTable, Column } from "@/components/DataTable";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { SalesAuditRow } from "@/app/api/types";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -20,9 +21,10 @@ export default function SalesAudit() {
   const [to, setTo] = useState(today());
   const [page, setPage] = useState(1);
   const [exporting, setExporting] = useState(false);
-  const { data, isLoading, isFetching } = useSalesAudit({ from, to, page });
+  const { data, isLoading, isFetching, isError, refetch } = useSalesAudit({ from, to, page });
   const { user } = useAuth();
   const canExport = isAdmin(user);
+  const tableLoading = isLoading || isFetching;
 
   const rows = data?.data ?? [];
   const perPage = data?.per_page ?? 0;
@@ -73,36 +75,38 @@ export default function SalesAudit() {
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1.5">
-          <label className="text-sm font-medium">From</label>
-          <Input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} />
+          <label htmlFor="sales-audit-from" className="text-sm font-medium">From</label>
+          <Input id="sales-audit-from" type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} />
         </div>
         <div className="space-y-1.5">
-          <label className="text-sm font-medium">To</label>
-          <Input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} />
+          <label htmlFor="sales-audit-to" className="text-sm font-medium">To</label>
+          <Input id="sales-audit-to" type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} />
         </div>
       </div>
 
       <Card>
         <CardContent className="py-4">
           <div className="text-xs text-muted-foreground">Amount on this page</div>
-          <div className="text-xl font-semibold">{formatCurrency(pageAmount)}</div>
+          <div className="text-xl font-semibold">
+            {tableLoading ? <Skeleton className="h-6 w-24" /> : formatCurrency(pageAmount)}
+          </div>
         </CardContent>
       </Card>
 
-      <div className="overflow-x-auto">
-        <DataTable
-          columns={columns}
-          data={rows}
-          loading={isLoading || isFetching}
-          rowKey={(r) => r.id}
-          page={data?.current_page}
-          lastPage={data?.last_page}
-          total={data?.total}
-          from={data?.from}
-          to={data?.to}
-          onPageChange={setPage}
-        />
-      </div>
+      <DataTable
+        columns={columns}
+        data={rows}
+        loading={tableLoading}
+        error={isError}
+        onRetry={() => refetch()}
+        rowKey={(r) => r.id}
+        page={data?.current_page}
+        lastPage={data?.last_page}
+        total={data?.total}
+        from={data?.from}
+        to={data?.to}
+        onPageChange={setPage}
+      />
     </div>
   );
 }

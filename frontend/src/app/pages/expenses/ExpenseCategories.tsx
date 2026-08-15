@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/dialog";
 
 export default function ExpenseCategories() {
-  const { data, isLoading } = useExpenseCategories();
+  const { data, isLoading, isError, refetch } = useExpenseCategories();
   const saveMutation = useSaveExpenseCategory();
   const deleteMutation = useDeleteExpenseCategory();
   const { user } = useAuth();
@@ -54,6 +54,7 @@ export default function ExpenseCategories() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!name.trim()) return;
     saveMutation.mutate(
       {
         id: editing?.id,
@@ -120,6 +121,8 @@ export default function ExpenseCategories() {
         columns={[...columns, actionColumn]}
         data={data ?? []}
         loading={isLoading}
+        error={isError}
+        onRetry={() => refetch()}
         rowKey={(r) => r.id}
         emptyMessage="No expense categories yet."
       />
@@ -132,16 +135,18 @@ export default function ExpenseCategories() {
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Name *</label>
+              <label htmlFor="expense-category-name" className="text-sm font-medium">Name *</label>
               <Input
+                id="expense-category-name"
                 placeholder="Category name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Description</label>
+              <label htmlFor="expense-category-description" className="text-sm font-medium">Description</label>
               <Textarea
+                id="expense-category-description"
                 rows={2}
                 placeholder="Optional notes"
                 value={description}
@@ -152,7 +157,7 @@ export default function ExpenseCategories() {
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={saveMutation.isPending}>
+              <Button type="submit" disabled={saveMutation.isPending || !name.trim()}>
                 {saveMutation.isPending ? "Saving…" : "Save"}
               </Button>
             </DialogFooter>

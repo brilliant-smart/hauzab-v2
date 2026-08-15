@@ -25,16 +25,16 @@ class AuthController extends Controller
             'device_id' => ['nullable', 'integer'],
         ]);
 
-        if (! Auth::attempt($request->only('email', 'password'))) {
+        if (! Auth::guard('web')->attempt($request->only('email', 'password'))) {
             throw ValidationException::withMessages([
                 'email' => [trans('auth.failed')],
             ]);
         }
 
-        $user = Auth::user();
+        $user = Auth::guard('web')->user();
 
         if (! $user->canLogin()) {
-            Auth::logout();
+            Auth::guard('web')->logout();
             throw ValidationException::withMessages([
                 'email' => ['This account is disabled. Contact an administrator.'],
             ]);

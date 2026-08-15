@@ -23,8 +23,12 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
-        <env name="DB_CONNECTION" value="sqlite"/>
-        <env name="DB_DATABASE" value=":memory:"/>
+        <!-- sqlite pdo isn't available in this stack; run the suite against the
+             real MySQL server using a "test_" table prefix, which keeps every
+             fixture table isolated from the live schema without needing a second
+             database (the app DB user has no CREATE DATABASE privilege). -->
+        <env name="DB_CONNECTION" value="mysql"/>
+        <env name="DB_PREFIX" value="test_"/>
         <env name="DB_URL" value=""/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>

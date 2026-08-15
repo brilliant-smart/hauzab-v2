@@ -28,6 +28,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   Dialog,
   DialogContent,
   DialogFooter,
@@ -73,7 +81,7 @@ export default function MakeSale() {
   const outbox = useOutbox();
   const qc = useQueryClient();
   const { data: productsData, isLoading } = useProducts({ search, per_page: 25 });
-  const { data: customersData } = useCustomers({ per_page: 50 });
+  const { data: customersData, isLoading: customersLoading } = useCustomers({ per_page: 50 });
 
   const products = productsData?.data ?? [];
 
@@ -271,36 +279,40 @@ export default function MakeSale() {
             className="max-w-sm"
           />
 
-          <div className="overflow-hidden rounded-md border">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2">Product</th>
-                  <th className="px-3 py-2 text-right">Stock</th>
-                  <th className="px-3 py-2 text-right">Price</th>
-                  <th className="px-3 py-2" />
-                </tr>
-              </thead>
-              <tbody>
+          <div className="overflow-x-auto rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Product</TableHead>
+                  <TableHead className="text-right">Stock</TableHead>
+                  <TableHead className="text-right">Price</TableHead>
+                  <TableHead className="w-10" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {isLoading && (
-                  <tr><td colSpan={4} className="px-3 py-6 text-center text-muted-foreground">Loading…</td></tr>
+                  <TableRow>
+                    <TableCell colSpan={4} className="h-20 text-center text-muted-foreground">Loading…</TableCell>
+                  </TableRow>
                 )}
                 {!isLoading && products.length === 0 && (
-                  <tr><td colSpan={4} className="px-3 py-6 text-center text-muted-foreground">No products</td></tr>
+                  <TableRow>
+                    <TableCell colSpan={4} className="h-20 text-center text-muted-foreground">No products</TableCell>
+                  </TableRow>
                 )}
                 {products.map((p) => {
                   const out = Number(p.quantity) <= 0;
                   return (
-                    <tr key={p.id} className="border-t">
-                      <td className="px-3 py-2">
+                    <TableRow key={p.id}>
+                      <TableCell>
                         <div className="font-medium">{p.name}</div>
                         <div className="text-xs text-muted-foreground">
                           {[p.size, p.barcode].filter(Boolean).join(" · ")}
                         </div>
-                      </td>
-                      <td className="px-3 py-2 text-right">{p.quantity}</td>
-                      <td className="px-3 py-2 text-right">{formatCurrency(p.selling_price)}</td>
-                      <td className="px-3 py-2 text-right">
+                      </TableCell>
+                      <TableCell className="text-right">{p.quantity}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(p.selling_price)}</TableCell>
+                      <TableCell className="text-right">
                         <Button
                           size="sm"
                           variant="ghost"
@@ -309,12 +321,12 @@ export default function MakeSale() {
                         >
                           <Plus className="size-4" /> Add
                         </Button>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   );
                 })}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         </div>
 
@@ -336,11 +348,17 @@ export default function MakeSale() {
                 <SelectValue placeholder="Walk-in customer" />
               </SelectTrigger>
               <SelectContent>
-                {customersData?.data.map((c) => (
-                  <SelectItem key={c.id} value={String(c.id)}>
-                    {c.name}
-                  </SelectItem>
-                ))}
+                {customersLoading ? (
+                  <SelectItem value="__loading" disabled>Loading customers…</SelectItem>
+                ) : (customersData?.data ?? []).length === 0 ? (
+                  <SelectItem value="__none" disabled>No customers on file</SelectItem>
+                ) : (
+                  customersData?.data.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {c.name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -361,6 +379,7 @@ export default function MakeSale() {
                     variant="ghost"
                     size="icon"
                     className="size-6"
+                    aria-label={`Remove ${line.name} from cart`}
                     onClick={() => cart.remove(line.productId)}
                   >
                     <X className="size-3.5" />
@@ -372,6 +391,7 @@ export default function MakeSale() {
                       variant="outline"
                       size="icon"
                       className="size-7"
+                      aria-label={`Decrease ${line.name} quantity`}
                       onClick={() => cart.setQty(line.productId, line.qty - 1)}
                     >
                       <Minus className="size-3" />
@@ -381,6 +401,7 @@ export default function MakeSale() {
                       min={1}
                       max={line.stock}
                       value={line.qty}
+                      aria-label={`${line.name} quantity`}
                       onChange={(e) =>
                         cart.setQty(line.productId, Number(e.target.value) || 0)
                       }
@@ -390,6 +411,7 @@ export default function MakeSale() {
                       variant="outline"
                       size="icon"
                       className="size-7"
+                      aria-label={`Increase ${line.name} quantity`}
                       onClick={() => cart.setQty(line.productId, line.qty + 1)}
                     >
                       <Plus className="size-3" />

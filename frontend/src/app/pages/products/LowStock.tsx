@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 
 export default function LowStock() {
   const [page, setPage] = useState(1);
-  const { data, isLoading, isFetching } = useLowStock({ page });
+  const { data, isLoading, isFetching, isError, refetch } = useLowStock({ page });
 
   const columns: Column<Product>[] = [
     {
@@ -54,6 +54,8 @@ export default function LowStock() {
         columns={columns}
         data={data?.data ?? []}
         loading={isLoading || isFetching}
+        error={isError}
+        onRetry={() => refetch()}
         rowKey={(p) => p.id}
         page={data?.current_page}
         lastPage={data?.last_page}

@@ -21,7 +21,7 @@ import {
 
 export type ReceiptFormat = "58mm" | "80mm" | "a4";
 
-const FORMAT_CONFIG: Record<
+export const FORMAT_CONFIG: Record<
   ReceiptFormat,
   { width: string; page: string; font: number; padding: string }
 > = {
@@ -36,7 +36,7 @@ function money(value: string | number | null | undefined): string {
 
 /** Normalized receipt shape so a server Order and an offline ProvisionalOrder
  * render through one body. */
-interface ReceiptVM {
+export interface ReceiptVM {
   number: string;
   isProvisional: boolean;
   createdAt: string;
@@ -58,7 +58,7 @@ interface ReceiptVM {
   statusLabel: string;
 }
 
-function toVM(order: ReceiptOrder): ReceiptVM {
+export function toVM(order: ReceiptOrder): ReceiptVM {
   if (order.is_provisional) {
     const p = order as ProvisionalOrder;
     return {

@@ -1,7 +1,8 @@
 import { ReactNode } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
 
 export interface Column<T> {
   key: string;
@@ -14,6 +15,8 @@ interface Props<T> {
   columns: Column<T>[];
   data: T[];
   loading?: boolean;
+  error?: boolean;
+  onRetry?: () => void;
   rowKey: (row: T) => string | number;
   page?: number;
   lastPage?: number;
@@ -28,6 +31,8 @@ export function DataTable<T>({
   columns,
   data,
   loading,
+  error,
+  onRetry,
   rowKey,
   page,
   lastPage,
@@ -51,12 +56,30 @@ export function DataTable<T>({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading ? (
+            {error ? (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
-                  Loading…
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <AlertCircle className="size-5 text-destructive" />
+                    <span>Couldn't load this data.</span>
+                    {onRetry && (
+                      <Button variant="outline" size="sm" onClick={onRetry}>
+                        Retry
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
+            ) : loading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={`skeleton-${i}`}>
+                  {columns.map((col) => (
+                    <TableCell key={col.key} className={col.className}>
+                      <Skeleton className="h-4 w-full max-w-[160px]" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
             ) : data.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
@@ -78,7 +101,7 @@ export function DataTable<T>({
         </Table>
       </div>
 
-      {onPageChange && (
+      {onPageChange && !error && !loading && (
         <div className="flex items-center justify-between text-sm text-muted-foreground">
           <span>
             {total != null && total > 0

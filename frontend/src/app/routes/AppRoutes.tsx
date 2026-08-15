@@ -1,33 +1,39 @@
+import { lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import Login from "@/app/pages/Login";
-import Dashboard from "@/app/pages/Dashboard";
 import Unauthorized from "@/app/pages/Unauthorized";
+import NotFound from "@/app/pages/NotFound";
 import AppLayout from "@/app/layouts/AppLayout";
 import ProtectedRoute from "@/app/routes/ProtectedRoute";
 import RoleProtectedRoute from "@/app/routes/RoleProtectedRoute";
 import { useAuth } from "@/app/auth/AuthContext";
 import { homePathFor } from "@/app/auth/guards";
-import ProductList from "@/app/pages/products/ProductList";
-import ProductForm from "@/app/pages/products/ProductForm";
-import LowStock from "@/app/pages/products/LowStock";
-import Expiring from "@/app/pages/products/Expiring";
-import Suppliers from "@/app/pages/products/Suppliers";
-import Manufacturers from "@/app/pages/products/Manufacturers";
-import Categories from "@/app/pages/products/Categories";
-import Units from "@/app/pages/products/Units";
-import EmployeeList from "@/app/pages/employees/EmployeeList";
-import EmployeeForm from "@/app/pages/employees/EmployeeForm";
-import MakeSale from "@/app/pages/pos/MakeSale";
-import SalesHistory from "@/app/pages/pos/SalesHistory";
-import SaleDetail from "@/app/pages/pos/SaleDetail";
-import ExpenseCategories from "@/app/pages/expenses/ExpenseCategories";
-import ExpenseList from "@/app/pages/expenses/ExpenseList";
-import SalesReport from "@/app/pages/reports/SalesReport";
-import SalesAudit from "@/app/pages/reports/SalesAudit";
-import StaffSales from "@/app/pages/reports/StaffSales";
-import ConsignmentList from "@/app/pages/consignments/ConsignmentList";
-import ConsignmentForm from "@/app/pages/consignments/ConsignmentForm";
-import ActivityLog from "@/app/pages/audit/ActivityLog";
+
+// Page-level routes are code-split. The Suspense boundary lives in AppLayout
+// (around <Outlet/>), so every routed page beneath it lazy-loads without a
+// flash. Login and Unauthorized render outside AppLayout and stay eager.
+const Dashboard = lazy(() => import("@/app/pages/Dashboard"));
+const ProductList = lazy(() => import("@/app/pages/products/ProductList"));
+const ProductForm = lazy(() => import("@/app/pages/products/ProductForm"));
+const LowStock = lazy(() => import("@/app/pages/products/LowStock"));
+const Expiring = lazy(() => import("@/app/pages/products/Expiring"));
+const Suppliers = lazy(() => import("@/app/pages/products/Suppliers"));
+const Manufacturers = lazy(() => import("@/app/pages/products/Manufacturers"));
+const Categories = lazy(() => import("@/app/pages/products/Categories"));
+const Units = lazy(() => import("@/app/pages/products/Units"));
+const EmployeeList = lazy(() => import("@/app/pages/employees/EmployeeList"));
+const EmployeeForm = lazy(() => import("@/app/pages/employees/EmployeeForm"));
+const MakeSale = lazy(() => import("@/app/pages/pos/MakeSale"));
+const SalesHistory = lazy(() => import("@/app/pages/pos/SalesHistory"));
+const SaleDetail = lazy(() => import("@/app/pages/pos/SaleDetail"));
+const ExpenseCategories = lazy(() => import("@/app/pages/expenses/ExpenseCategories"));
+const ExpenseList = lazy(() => import("@/app/pages/expenses/ExpenseList"));
+const SalesReport = lazy(() => import("@/app/pages/reports/SalesReport"));
+const SalesAudit = lazy(() => import("@/app/pages/reports/SalesAudit"));
+const StaffSales = lazy(() => import("@/app/pages/reports/StaffSales"));
+const ConsignmentList = lazy(() => import("@/app/pages/consignments/ConsignmentList"));
+const ConsignmentForm = lazy(() => import("@/app/pages/consignments/ConsignmentForm"));
+const ActivityLog = lazy(() => import("@/app/pages/audit/ActivityLog"));
 
 const MANAGER_ROLES = ["admin", "supervisor"] as const;
 
@@ -231,7 +237,8 @@ export default function AppRoutes() {
         />
       </Route>
 
-      <Route path="*" element={<HomeRedirect />} />
+      <Route path="/" element={<HomeRedirect />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }

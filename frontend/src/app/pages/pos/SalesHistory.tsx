@@ -37,11 +37,11 @@ interface SalesRow {
 
 function StatusBadge({ status }: { status: SalesRow["status"] }) {
   if (status.value === "completed")
-    return <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">Completed</Badge>;
+    return <Badge variant="success">Completed</Badge>;
   if (status.value === "voided")
     return <Badge variant="destructive">Voided</Badge>;
   if (status.value === "pending_sync")
-    return <Badge className="bg-amber-500 text-white hover:bg-amber-500">Pending sync</Badge>;
+    return <Badge variant="warning">Pending sync</Badge>;
   if (status.value === "sync_failed")
     return <Badge variant="destructive">Sync failed</Badge>;
   return <Badge variant="outline">Pending</Badge>;
@@ -105,7 +105,7 @@ export default function SalesHistory() {
   const params: Record<string, unknown> = { search, page, per_page: 25 };
   if (status !== "all") params.status = status;
 
-  const { data, isLoading, isFetching } = useOrders(params);
+  const { data, isLoading, isFetching, isError, refetch } = useOrders(params);
 
   const serverOrders = data?.data ?? [];
   const serverUuids = new Set(serverOrders.map((o) => o.uuid));
@@ -183,7 +183,7 @@ export default function SalesHistory() {
       <PageHeader title="Sales History" description={canSeeAll ? "All register sales" : "Your sales for this shift"} />
 
       {pendingCount > 0 && (
-        <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900">
+        <div className="rounded-md border border-warning/40 bg-warning/10 px-4 py-2 text-sm text-warning-foreground">
           {pendingCount} sale{pendingCount === 1 ? "" : "s"} pending sync — they’ll be sent to the server when connectivity returns.
         </div>
       )}
@@ -215,6 +215,8 @@ export default function SalesHistory() {
         columns={columns}
         data={rows}
         loading={isLoading || isFetching}
+        error={isError}
+        onRetry={() => refetch()}
         rowKey={(r) => r.uuid}
         page={data?.current_page}
         lastPage={data?.last_page}

@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 export default function ProductList() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const { data, isLoading, isFetching } = useProducts({ search, page });
+  const { data, isLoading, isFetching, isError, refetch } = useProducts({ search, page });
   const deleteMutation = useDeleteProduct();
 
   const handleDelete = (product: Product) => {
@@ -84,7 +84,7 @@ export default function ProductList() {
       className: "text-right",
       cell: (p) => (
         <div className="flex items-center justify-end gap-1">
-          <Button asChild variant="ghost" size="icon">
+          <Button asChild variant="ghost" size="icon" aria-label={`Edit ${p.name}`}>
             <Link to={`/products/${p.id}/edit`}>
               <Pencil className="size-4" />
             </Link>
@@ -127,6 +127,8 @@ export default function ProductList() {
         columns={columns}
         data={data?.data ?? []}
         loading={isLoading || isFetching}
+        error={isError}
+        onRetry={() => refetch()}
         rowKey={(p) => p.id}
         page={data?.current_page}
         lastPage={data?.last_page}

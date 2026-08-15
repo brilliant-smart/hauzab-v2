@@ -54,7 +54,8 @@ export default function Login() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-sm">
-        <CardHeader>
+        <CardHeader className="space-y-3">
+          <img src="/logo.png" alt="Hauzab" className="size-12 rounded-lg object-contain" />
           <CardTitle>Sign in to Hauzab</CardTitle>
         </CardHeader>
         <CardContent>

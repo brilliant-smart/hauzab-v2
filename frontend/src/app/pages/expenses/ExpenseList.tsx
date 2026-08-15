@@ -39,7 +39,7 @@ const NONE = "__none__";
 export default function ExpenseList() {
   const [categoryId, setCategoryId] = useState<string>("");
   const [page, setPage] = useState(1);
-  const { data, isLoading, isFetching } = useExpenses({
+  const { data, isLoading, isFetching, isError, refetch } = useExpenses({
     category_id: categoryId || undefined,
     page,
   });
@@ -74,6 +74,10 @@ export default function ExpenseList() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const amount = Number(form.amount);
+    if (!form.description.trim() || !form.amount || Number.isNaN(amount) || amount <= 0 || !form.date) {
+      return;
+    }
     saveMutation.mutate(
       {
         id: editing?.id,
@@ -82,7 +86,7 @@ export default function ExpenseList() {
             ? Number(form.expense_category_id)
             : null,
           description: form.description,
-          amount: Number(form.amount),
+          amount,
           date: form.date,
         },
       },
@@ -103,6 +107,14 @@ export default function ExpenseList() {
       onError: (err) => handleApiError(err),
     });
   };
+
+  const amountNum = Number(form.amount);
+  const formValid =
+    form.description.trim().length > 0 &&
+    form.amount !== "" &&
+    !Number.isNaN(amountNum) &&
+    amountNum > 0 &&
+    !!form.date;
 
   const columns: Column<Expense>[] = [
     {
@@ -172,6 +184,8 @@ export default function ExpenseList() {
         columns={columns}
         data={data?.data ?? []}
         loading={isLoading || isFetching}
+        error={isError}
+        onRetry={() => refetch()}
         rowKey={(r) => r.id}
         page={data?.current_page}
         lastPage={data?.last_page}
@@ -189,12 +203,12 @@ export default function ExpenseList() {
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Category</label>
+              <label htmlFor="expense-category" className="text-sm font-medium">Category</label>
               <Select
                 value={form.expense_category_id || NONE}
                 onValueChange={(v) => setForm((s) => ({ ...s, expense_category_id: v === NONE ? "" : v }))}
               >
-                <SelectTrigger>
+                <SelectTrigger id="expense-category">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -206,8 +220,9 @@ export default function ExpenseList() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Description *</label>
+              <label htmlFor="expense-description" className="text-sm font-medium">Description *</label>
               <Textarea
+                id="expense-description"
                 rows={2}
                 placeholder="What was the expense for?"
                 value={form.description}
@@ -216,8 +231,9 @@ export default function ExpenseList() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Amount *</label>
+                <label htmlFor="expense-amount" className="text-sm font-medium">Amount *</label>
                 <Input
+                  id="expense-amount"
                   type="number"
                   step="any"
                   min={0}
@@ -227,8 +243,9 @@ export default function ExpenseList() {
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Date *</label>
+                <label htmlFor="expense-date" className="text-sm font-medium">Date *</label>
                 <Input
+                  id="expense-date"
                   type="date"
                   value={form.date}
                   onChange={(e) => setForm((s) => ({ ...s, date: e.target.value }))}
@@ -239,7 +256,7 @@ export default function ExpenseList() {
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={saveMutation.isPending}>
+              <Button type="submit" disabled={saveMutation.isPending || !formValid}>
                 {saveMutation.isPending ? "Saving…" : "Save"}
               </Button>
             </DialogFooter>

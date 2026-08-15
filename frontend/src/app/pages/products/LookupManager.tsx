@@ -45,7 +45,7 @@ export interface LookupConfig {
 
 export default function LookupManager({ config }: { config: LookupConfig }) {
   const { resource, title, description, itemNoun, fields, columns } = config;
-  const { data, isLoading } = useLookupList<Row>(resource);
+  const { data, isLoading, isError, refetch } = useLookupList<Row>(resource);
   const saveMutation = useSaveLookup(resource);
   const deleteMutation = useDeleteLookup(resource);
 
@@ -75,6 +75,7 @@ export default function LookupManager({ config }: { config: LookupConfig }) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (fields.some((f) => f.required && !(form[f.name as string] ?? "").trim())) return;
     const payload: Record<string, unknown> = { ...form };
     // Send null for empty optional fields instead of empty strings.
     fields.forEach((f) => {
@@ -101,13 +102,15 @@ export default function LookupManager({ config }: { config: LookupConfig }) {
     });
   };
 
+  const formValid = fields.every((f) => !f.required || (form[f.name as string] ?? "").trim().length > 0);
+
   const actionColumn: Column<Row> = {
     key: "actions",
     header: "",
     className: "text-right",
     cell: (row) => (
       <div className="flex items-center justify-end gap-1">
-        <Button variant="ghost" size="icon" onClick={() => openEdit(row)}>
+        <Button variant="ghost" size="icon" aria-label={`Edit ${row.name}`} onClick={() => openEdit(row)}>
           <Pencil className="size-4" />
         </Button>
         <ConfirmDelete
@@ -135,6 +138,8 @@ export default function LookupManager({ config }: { config: LookupConfig }) {
         columns={[...columns, actionColumn]}
         data={data ?? []}
         loading={isLoading}
+        error={isError}
+        onRetry={() => refetch()}
         rowKey={(r) => r.id}
         emptyMessage={`No ${itemNoun.toLowerCase()}s yet.`}
       />
@@ -146,33 +151,38 @@ export default function LookupManager({ config }: { config: LookupConfig }) {
             <DialogDescription>{description}</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {fields.map((f) => (
-              <div key={f.name as string} className="space-y-1.5">
-                <label className="text-sm font-medium">
-                  {f.label}{f.required ? " *" : ""}
-                </label>
-                {f.type === "textarea" ? (
-                  <Textarea
-                    rows={2}
-                    placeholder={f.placeholder}
-                    value={form[f.name as string] ?? ""}
-                    onChange={(e) => setForm((s) => ({ ...s, [f.name as string]: e.target.value }))}
-                  />
-                ) : (
-                  <Input
-                    type={f.type ?? "text"}
-                    placeholder={f.placeholder}
-                    value={form[f.name as string] ?? ""}
-                    onChange={(e) => setForm((s) => ({ ...s, [f.name as string]: e.target.value }))}
-                  />
-                )}
-              </div>
-            ))}
+            {fields.map((f) => {
+              const fieldId = `lookup-${String(f.name)}`;
+              return (
+                <div key={f.name as string} className="space-y-1.5">
+                  <label htmlFor={fieldId} className="text-sm font-medium">
+                    {f.label}{f.required ? " *" : ""}
+                  </label>
+                  {f.type === "textarea" ? (
+                    <Textarea
+                      id={fieldId}
+                      rows={2}
+                      placeholder={f.placeholder}
+                      value={form[f.name as string] ?? ""}
+                      onChange={(e) => setForm((s) => ({ ...s, [f.name as string]: e.target.value }))}
+                    />
+                  ) : (
+                    <Input
+                      id={fieldId}
+                      type={f.type ?? "text"}
+                      placeholder={f.placeholder}
+                      value={form[f.name as string] ?? ""}
+                      onChange={(e) => setForm((s) => ({ ...s, [f.name as string]: e.target.value }))}
+                    />
+                  )}
+                </div>
+              );
+            })}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={saveMutation.isPending}>
+              <Button type="submit" disabled={saveMutation.isPending || !formValid}>
                 {saveMutation.isPending ? "Saving…" : "Save"}
               </Button>
             </DialogFooter>

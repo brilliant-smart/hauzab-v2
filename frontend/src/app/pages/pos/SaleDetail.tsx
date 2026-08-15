@@ -90,7 +90,7 @@ export default function SaleDetail() {
             <div className="flex items-center justify-between pt-1">
               <span className="text-muted-foreground">Status</span>
               {order.status.value === "completed" ? (
-                <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">Completed</Badge>
+                <Badge variant="success">Completed</Badge>
               ) : order.status.value === "voided" ? (
                 <Badge variant="destructive">Voided</Badge>
               ) : (

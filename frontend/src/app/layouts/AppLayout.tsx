@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Suspense, useState } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
   BarChart3,
@@ -25,6 +25,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { ModeToggle } from "@/components/ModeToggle";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import {
   Collapsible,
   CollapsibleContent,
@@ -50,8 +52,8 @@ interface NavItem {
 const PRODUCTS_CHILDREN: NavLeaf[] = [
   { to: "/products/new", label: "Add New" },
   { to: "/products", label: "Product List" },
-  { to: "/products/low-stock", label: "Product Reminder" },
-  { to: "/products/expiring", label: "Expired Product" },
+  { to: "/products/low-stock", label: "Low Stock" },
+  { to: "/products/expiring", label: "Expiring Soon" },
   { to: "/suppliers", label: "Product Supplier" },
   { to: "/manufacturers", label: "Product Manufacturer" },
   { to: "/categories", label: "Product Category" },
@@ -213,8 +215,8 @@ function SyncStatus() {
       className={cn(
         "flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium",
         online
-          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-          : "border-amber-200 bg-amber-50 text-amber-700",
+          ? "border-success/30 bg-success/10 text-success"
+          : "border-warning/30 bg-warning/10 text-warning",
       )}
       title={
         online
@@ -238,17 +240,54 @@ function SyncStatus() {
   );
 }
 
+function BrandMark() {
+  return (
+    <div className="flex items-center gap-2">
+      <img src="/logo.png" alt="" className="size-8 rounded-md object-contain" />
+      <span className="text-lg font-semibold tracking-tight">Hauzab</span>
+    </div>
+  );
+}
+
+const PAGE_TITLES: Record<string, string> = {
+  "/dashboard": "Dashboard",
+  "/pos": "Make Sale",
+  "/pos/history": "Sales History",
+  "/products": "Products",
+  "/products/new": "Add Product",
+  "/products/low-stock": "Low Stock",
+  "/products/expiring": "Expiring Soon",
+  "/suppliers": "Suppliers",
+  "/manufacturers": "Manufacturers",
+  "/categories": "Categories",
+  "/units": "Units",
+  "/employees": "Employees",
+  "/expenses": "Expenses",
+  "/expense-categories": "Expense Categories",
+  "/reports/sales": "Sales Report",
+  "/reports/sales-audit": "Sales Audit",
+  "/reports/staff-sales": "Staff Sales",
+  "/consignments": "Consignments",
+  "/audit-logs": "Activity Log",
+};
+
+function pageTitle(pathname: string): string {
+  if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname];
+  if (PAGE_TITLES[`/${pathname.split("/")[1]}`]) return PAGE_TITLES[`/${pathname.split("/")[1]}`];
+  return "Hauzab";
+}
+
 export default function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { pathname } = useLocation();
 
   return (
     <div className="min-h-screen bg-muted/30">
       <div className="flex">
         {/* Desktop sidebar */}
         <aside className="hidden w-64 shrink-0 border-r bg-card md:block">
-          <div className="flex h-16 items-center gap-2 border-b px-5">
-            <ShoppingCart className="size-5 text-primary" />
-            <span className="text-lg font-semibold">Hauzab</span>
+          <div className="flex h-16 items-center border-b px-5">
+            <BrandMark />
           </div>
           <SidebarBody />
         </aside>
@@ -259,31 +298,41 @@ export default function AppLayout() {
             <div className="flex items-center gap-2 md:hidden">
               <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="outline" size="icon">
+                  <Button variant="outline" size="icon" aria-label="Open navigation menu">
                     <Menu className="size-4" />
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="left" className="w-64 p-0">
                   <div className="flex h-16 items-center justify-between gap-2 border-b px-5">
-                    <div className="flex items-center gap-2">
-                      <ShoppingCart className="size-5 text-primary" />
-                      <span className="text-lg font-semibold">Hauzab</span>
-                    </div>
+                    <BrandMark />
                   </div>
                   <SidebarBody onNavigate={() => setMobileOpen(false)} />
                 </SheetContent>
               </Sheet>
               <span className="text-lg font-semibold">Hauzab</span>
             </div>
-            <div className="hidden md:block" />
-            <div className="flex items-center gap-3">
-              <SyncStatus />
+            <h1 className="hidden text-base font-semibold md:block">{pageTitle(pathname)}</h1>
+            <div className="flex items-center gap-2">
+              <ModeToggle />
+              <div className="hidden sm:block">
+                <SyncStatus />
+              </div>
               <UserMenu />
             </div>
           </header>
 
           <main className="flex-1 p-4 md:p-6">
-            <Outlet />
+            <ErrorBoundary resetKey={pathname}>
+              <Suspense
+                fallback={
+                  <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
+                    Loading…
+                  </div>
+                }
+              >
+                <Outlet />
+              </Suspense>
+            </ErrorBoundary>
           </main>
         </div>
       </div>

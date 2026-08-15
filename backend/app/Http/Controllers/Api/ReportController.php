@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\OrderResource;
 use App\Models\Order;
 use App\Models\ProductCard;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -155,13 +156,20 @@ class ReportController extends Controller
         [$from, $to] = $this->range($request);
         $statuses = [OrderStatus::Completed->value, OrderStatus::Credit->value];
 
+        $orders = (new Order)->getTable();
+        $users = (new User)->getTable();
+        // selectRaw is emitted verbatim, so the table prefix (only set in the
+        // test suite) must be applied by hand; the join/where/groupBy clauses
+        // above are qualified by the grammar already.
+        $prefix = DB::getTablePrefix();
+
         $rows = Order::query()
-            ->join('users', 'users.id', '=', 'orders.user_id')
-            ->whereIn('orders.status', $statuses)
-            ->whereDate('orders.created_at', '>=', $from)
-            ->whereDate('orders.created_at', '<=', $to)
-            ->selectRaw('users.id as user_id, users.name as user_name, COUNT(*) as sales_count, COALESCE(SUM(orders.amount_paid),0) as total')
-            ->groupBy('users.id', 'users.name')
+            ->join($users, "$users.id", '=', "$orders.user_id")
+            ->whereIn("$orders.status", $statuses)
+            ->whereDate("$orders.created_at", '>=', $from)
+            ->whereDate("$orders.created_at", '<=', $to)
+            ->selectRaw("{$prefix}{$users}.id as user_id, {$prefix}{$users}.name as user_name, COUNT(*) as sales_count, COALESCE(SUM({$prefix}{$orders}.amount_paid),0) as total")
+            ->groupBy("$users.id", "$users.name")
             ->orderByDesc('total')
             ->get();
 

@@ -36,6 +36,21 @@ const schema = z.object({
   expire_date: z.string().optional(),
   date: z.string().optional(),
   barcode: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.unit_price < data.unit_cost) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["unit_price"],
+      message: "Unit price cannot be below unit cost",
+    });
+  }
+  if (data.manufacture_date && data.expire_date && data.expire_date <= data.manufacture_date) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["expire_date"],
+      message: "Expire date must be after the manufacture date",
+    });
+  }
 });
 
 type FormValues = z.infer<typeof schema>;

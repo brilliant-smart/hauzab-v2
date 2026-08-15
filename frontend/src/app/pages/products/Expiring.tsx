@@ -16,7 +16,7 @@ function daysUntil(date: string | null | undefined): number | null {
 
 export default function Expiring() {
   const [page, setPage] = useState(1);
-  const { data, isLoading, isFetching } = useExpiring({ page });
+  const { data, isLoading, isFetching, isError, refetch } = useExpiring({ page });
 
   const columns: Column<Product>[] = [
     {
@@ -39,7 +39,7 @@ export default function Expiring() {
         const overdue = days != null && days < 0;
         const soon = days != null && days <= 30;
         return (
-          <span className={overdue ? "text-destructive" : soon ? "text-amber-600" : ""}>
+          <span className={overdue ? "text-destructive" : soon ? "text-warning" : ""}>
             {new Date(p.expire_date!).toLocaleDateString("en-GB")}
             {days != null && (
               <span className="ml-1 text-xs text-muted-foreground">
@@ -74,6 +74,8 @@ export default function Expiring() {
         columns={columns}
         data={data?.data ?? []}
         loading={isLoading || isFetching}
+        error={isError}
+        onRetry={() => refetch()}
         rowKey={(p) => p.id}
         page={data?.current_page}
         lastPage={data?.last_page}

@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 export default function ConsignmentList() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const { data, isLoading, isFetching } = useConsignments({ search, page });
+  const { data, isLoading, isFetching, isError, refetch } = useConsignments({ search, page });
   const deleteMutation = useDeleteConsignment();
   const { user } = useAuth();
   const canMutate = isAdmin(user);
@@ -101,6 +101,8 @@ export default function ConsignmentList() {
         columns={columns}
         data={data?.data ?? []}
         loading={isLoading || isFetching}
+        error={isError}
+        onRetry={() => refetch()}
         rowKey={(r) => r.id}
         page={data?.current_page}
         lastPage={data?.last_page}

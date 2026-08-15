@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -29,7 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-const schema = z.object({
+const baseSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Valid email required"),
   password: z.string().optional(),
@@ -48,7 +48,7 @@ const schema = z.object({
   salary: z.coerce.number().min(0).optional(),
 });
 
-type FormValues = z.infer<typeof schema>;
+type FormValues = z.infer<typeof baseSchema>;
 
 export default function EmployeeForm() {
   const { id } = useParams();
@@ -59,6 +59,20 @@ export default function EmployeeForm() {
 
   const { data: employee } = useEmployee(id ? Number(id) : undefined);
   const saveMutation = useSaveEmployee();
+
+  const schema = useMemo(
+    () =>
+      baseSchema.superRefine((data, ctx) => {
+        if (!isEdit && !data.password) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["password"],
+            message: "Password is required for new employees",
+          });
+        }
+      }),
+    [isEdit],
+  );
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),

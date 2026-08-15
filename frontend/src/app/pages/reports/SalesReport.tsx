@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -22,7 +23,8 @@ export default function SalesReport() {
   const [from, setFrom] = useState(today());
   const [to, setTo] = useState(today());
   const [page, setPage] = useState(1);
-  const { data, isLoading, isFetching } = useSalesReport({ from, to, page });
+  const { data, isLoading, isFetching, isError, refetch } = useSalesReport({ from, to, page });
+  const sumsLoading = isLoading || isFetching;
 
   return (
     <div className="space-y-4">
@@ -30,12 +32,12 @@ export default function SalesReport() {
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1.5">
-          <label className="text-sm font-medium">From</label>
-          <Input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} />
+          <label htmlFor="sales-report-from" className="text-sm font-medium">From</label>
+          <Input id="sales-report-from" type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} />
         </div>
         <div className="space-y-1.5">
-          <label className="text-sm font-medium">To</label>
-          <Input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} />
+          <label htmlFor="sales-report-to" className="text-sm font-medium">To</label>
+          <Input id="sales-report-to" type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} />
         </div>
         <Button variant="outline" asChild>
           <Link to="/pos/history">Sales History</Link>
@@ -46,24 +48,39 @@ export default function SalesReport() {
         <Card>
           <CardContent className="py-4">
             <div className="text-xs text-muted-foreground">Sales count</div>
-            <div className="text-xl font-semibold">{data?.sums.count ?? 0}</div>
+            <div className="text-xl font-semibold">
+              {sumsLoading ? <Skeleton className="h-6 w-16" /> : data?.sums.count ?? 0}
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-4">
             <div className="text-xs text-muted-foreground">Total sales</div>
-            <div className="text-xl font-semibold">{formatCurrency(data?.sums.total)}</div>
+            <div className="text-xl font-semibold">
+              {sumsLoading ? <Skeleton className="h-6 w-24" /> : formatCurrency(data?.sums.total)}
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-4">
             <div className="text-xs text-muted-foreground">Amount paid</div>
-            <div className="text-xl font-semibold">{formatCurrency(data?.sums.amount_paid)}</div>
+            <div className="text-xl font-semibold">
+              {sumsLoading ? <Skeleton className="h-6 w-24" /> : formatCurrency(data?.sums.amount_paid)}
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      <SalesTable from={from} to={to} page={page} setPage={setPage} isLoading={isLoading || isFetching} data={data} />
+      <SalesTable
+        from={from}
+        to={to}
+        page={page}
+        setPage={setPage}
+        isLoading={isLoading || isFetching}
+        isError={isError}
+        onRetry={() => refetch()}
+        data={data}
+      />
     </div>
   );
 }
@@ -74,10 +91,12 @@ interface SalesTableProps {
   page: number;
   setPage: (p: number) => void;
   isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
   data: ReturnType<typeof useSalesReport>["data"];
 }
 
-function SalesTable({ page, setPage, isLoading, data }: SalesTableProps) {
+function SalesTable({ page, setPage, isLoading, isError, onRetry, data }: SalesTableProps) {
   const orders = data?.data ?? [];
   const perPage = data?.per_page ?? 0;
   const offset = ((data?.current_page ?? 1) - 1) * perPage;
@@ -111,6 +130,8 @@ function SalesTable({ page, setPage, isLoading, data }: SalesTableProps) {
       columns={columns}
       data={orders}
       loading={isLoading}
+      error={isError}
+      onRetry={onRetry}
       rowKey={(o) => o.id}
       page={data?.current_page}
       lastPage={data?.last_page}

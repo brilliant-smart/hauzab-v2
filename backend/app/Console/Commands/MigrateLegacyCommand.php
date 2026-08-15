@@ -384,9 +384,8 @@ class MigrateLegacyCommand extends Command
             foreach ($rows as $r) {
                 $this->output->progressAdvance();
 
-                $number = $r->order_id;
-                if (isset($dupPrimary[$r->order_id]) && (int) $r->id !== (int) $dupPrimary[$r->order_id]) {
-                    $number = $r->order_id.'-'.$r->id;
+                $number = $this->resolveOrderNumber($r->order_id, (int) $r->id, $dupPrimary);
+                if ($number !== $r->order_id) {
                     $suffixed++;
                 }
 
@@ -921,6 +920,20 @@ class MigrateLegacyCommand extends Command
             return '0.0000';
         }
         return bcadd((string) $value, '0', 4);
+    }
+
+    /**
+     * Decide an order's v2 number. A duplicated legacy order_id keeps its clean
+     * number for the chosen primary row; every other row in the group is
+     * disambiguated with a "-<legacyId>" suffix so (tenant_id, number) stays unique.
+     */
+    private function resolveOrderNumber(string $orderId, int $rowId, array $dupPrimary): string
+    {
+        if (isset($dupPrimary[$orderId]) && $rowId !== (int) $dupPrimary[$orderId]) {
+            return $orderId.'-'.$rowId;
+        }
+
+        return $orderId;
     }
 
     private function parseDate(?string $value): ?string
