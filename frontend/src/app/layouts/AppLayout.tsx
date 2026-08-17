@@ -5,13 +5,16 @@ import {
   BarChart3,
   Boxes,
   ChevronDown,
+  Contact,
   LayoutDashboard,
   LogOut,
   Menu,
   Package,
   Receipt,
   ScrollText,
+  Settings,
   ShoppingCart,
+  Smartphone,
   Users,
   Wallet,
   Wifi,
@@ -80,6 +83,7 @@ const MANAGER_NAV: NavItem[] = [
     children: PRODUCTS_CHILDREN,
   },
   { to: "/employees", label: "Employee Record", icon: Users },
+  { to: "/customers", label: "Customers", icon: Contact },
   {
     label: "Expenses",
     icon: Wallet,
@@ -91,12 +95,18 @@ const MANAGER_NAV: NavItem[] = [
     children: REPORTS_CHILDREN,
   },
   { to: "/consignments", label: "Product Consignment", icon: Package },
+  { to: "/devices", label: "Devices", icon: Smartphone },
   { to: "/audit-logs", label: "Activity Log", icon: ScrollText },
 ];
 
 const POS_NAV: NavItem[] = [
   { to: "/pos", label: "Make Sale", icon: ShoppingCart, end: true },
   { to: "/pos/history", label: "Sales History", icon: Receipt },
+];
+
+// Self-service — available to every signed-in user regardless of role.
+const ACCOUNT_NAV: NavItem[] = [
+  { to: "/settings", label: "Settings", icon: Settings, end: true },
 ];
 
 function NavRow({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }) {
@@ -178,6 +188,10 @@ function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
           ))}
         </>
       )}
+      <div className="my-2 border-t" />
+      {ACCOUNT_NAV.map((item) => (
+        <NavRow key={item.label} item={item} onNavigate={onNavigate} />
+      ))}
     </nav>
   );
 }
@@ -262,6 +276,8 @@ const PAGE_TITLES: Record<string, string> = {
   "/categories": "Categories",
   "/units": "Units",
   "/employees": "Employees",
+  "/customers": "Customers",
+  "/devices": "Devices",
   "/expenses": "Expenses",
   "/expense-categories": "Expense Categories",
   "/reports/sales": "Sales Report",
@@ -269,6 +285,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/reports/staff-sales": "Staff Sales",
   "/consignments": "Consignments",
   "/audit-logs": "Activity Log",
+  "/settings": "Settings",
 };
 
 function pageTitle(pathname: string): string {

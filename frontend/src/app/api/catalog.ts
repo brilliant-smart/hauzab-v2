@@ -95,6 +95,49 @@ export function useDeleteProduct() {
   });
 }
 
+export interface ImportResult {
+  imported: number;
+  updated: number;
+  skipped: number;
+  errors: string[];
+}
+
+export function useImportProducts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: File): Promise<ImportResult> => {
+      const form = new FormData();
+      form.append("file", file);
+      const { data } = await api.post<ImportResult>("products/import", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 120000,
+      });
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: productKeys.all });
+    },
+  });
+}
+
+export async function downloadProductTemplate(): Promise<void> {
+  const { data } = await api.get("products/import/template", {
+    responseType: "blob",
+  });
+  const url = window.URL.createObjectURL(
+    new Blob([data], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    }),
+  );
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "hauzab-product-template.xlsx";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
+
 type LookupResource = NamedResource & Partial<ContactResource>;
 
 export function useLookupList<T extends LookupResource = NamedResource>(key: LookupKey) {

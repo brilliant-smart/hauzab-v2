@@ -1,11 +1,9 @@
-import { useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { useAuth } from "@/app/auth/AuthContext";
-import { homePathFor } from "@/app/auth/guards";
+import { resetPassword } from "@/app/api/auth";
 import { handleApiError } from "@/app/lib/errorHandler";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,35 +17,41 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 
-const schema = z.object({
-  email: z.string().email("Enter a valid email"),
-  password: z.string().min(1, "Enter your password"),
-});
+const schema = z
+  .object({
+    password: z.string().min(8, "At least 8 characters"),
+    password_confirmation: z.string().min(8, "At least 8 characters"),
+  })
+  .refine((d) => d.password === d.password_confirmation, {
+    message: "Passwords don't match",
+    path: ["password_confirmation"],
+  });
 
 type FormValues = z.infer<typeof schema>;
 
-export default function Login() {
-  const { isAuthenticated, login, loading, user } = useAuth();
+export default function ResetPassword() {
   const navigate = useNavigate();
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate(homePathFor(user), { replace: true });
-    }
-  }, [isAuthenticated, user, navigate]);
+  const [params] = useSearchParams();
+  const token = params.get("token") ?? "";
+  const email = params.get("email") ?? "";
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { email: "", password: "" },
+    defaultValues: { password: "", password_confirmation: "" },
   });
 
   const onSubmit = async (values: FormValues) => {
     try {
-      const user = await login(values.email, values.password);
-      toast.success(`Welcome back, ${user.name}`);
-      navigate(homePathFor(user), { replace: true });
+      await resetPassword({
+        token,
+        email,
+        password: values.password,
+        password_confirmation: values.password_confirmation,
+      });
+      toast.success("Your password has been reset. You can sign in now.");
+      navigate("/login", { replace: true });
     } catch (error) {
-      handleApiError(error, "Unable to sign in. Please check your credentials.");
+      handleApiError(error, "Unable to reset the password. The link may have expired.");
     }
   };
 
@@ -56,24 +60,19 @@ export default function Login() {
       <Card className="w-full max-w-sm">
         <CardHeader className="space-y-3">
           <img src="/logo.png" alt="Hauzab" className="size-12 rounded-lg object-contain" />
-          <CardTitle>Sign in to Hauzab</CardTitle>
+          <CardTitle>Choose a new password</CardTitle>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
-                name="email"
+                name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel>New password</FormLabel>
                     <FormControl>
-                      <Input
-                        type="email"
-                        placeholder="you@example.com"
-                        autoComplete="username"
-                        {...field}
-                      />
+                      <Input type="password" autoComplete="new-password" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -81,16 +80,12 @@ export default function Login() {
               />
               <FormField
                 control={form.control}
-                name="password"
+                name="password_confirmation"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>Confirm new password</FormLabel>
                     <FormControl>
-                      <Input
-                        type="password"
-                        autoComplete="current-password"
-                        {...field}
-                      />
+                      <Input type="password" autoComplete="new-password" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -99,20 +94,17 @@ export default function Login() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={loading || form.formState.isSubmitting}
+                disabled={form.formState.isSubmitting}
               >
-                {form.formState.isSubmitting ? "Signing in…" : "Sign in"}
+                {form.formState.isSubmitting ? "Resetting…" : "Reset password"}
               </Button>
-              <div className="text-center text-sm">
-                <Link
-                  to="/forgot-password"
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  Forgot password?
-                </Link>
-              </div>
             </form>
           </Form>
+          <div className="mt-4 text-center text-sm">
+            <Link to="/login" className="text-muted-foreground hover:text-foreground">
+              Back to sign in
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </div>

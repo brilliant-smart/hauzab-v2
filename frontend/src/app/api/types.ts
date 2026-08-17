@@ -94,6 +94,23 @@ export interface Customer {
   created_at?: string;
 }
 
+export interface Branch {
+  id: number;
+  name: string;
+}
+
+export interface Device {
+  id: number;
+  tenant_id?: number;
+  branch_id?: number | null;
+  name: string;
+  is_active: boolean;
+  last_seen_at?: string | null;
+  branch?: { id: number; name: string } | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export type OrderStatusValue = "pending" | "completed" | "voided" | "credit";
 export type PaymentMethodValue = "cash" | "pos" | "transfer";
 

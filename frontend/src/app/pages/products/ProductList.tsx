@@ -1,9 +1,16 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { Pencil, Plus } from "lucide-react";
-import { useDeleteProduct, useProducts } from "@/app/api/catalog";
+import { Download, Pencil, Plus, Upload } from "lucide-react";
+import {
+  downloadProductTemplate,
+  useDeleteProduct,
+  useImportProducts,
+  useProducts,
+} from "@/app/api/catalog";
 import { Product } from "@/app/api/types";
+import { useAuth } from "@/app/auth/AuthContext";
+import { isAtLeast } from "@/app/auth/guards";
 import { handleApiError } from "@/app/lib/errorHandler";
 import { formatCurrency, formatNumber } from "@/app/lib/format";
 import { PageHeader } from "@/components/PageHeader";
@@ -18,12 +25,39 @@ export default function ProductList() {
   const [page, setPage] = useState(1);
   const { data, isLoading, isFetching, isError, refetch } = useProducts({ search, page });
   const deleteMutation = useDeleteProduct();
+  const importMutation = useImportProducts();
+  const { user } = useAuth();
+  const canManage = isAtLeast(user, "supervisor");
+  const fileInput = useRef<HTMLInputElement>(null);
 
   const handleDelete = (product: Product) => {
     deleteMutation.mutate(product.id, {
       onSuccess: () => toast.success("Product deleted"),
       onError: (e) => handleApiError(e),
     });
+  };
+
+  const handleFile = (file: File | undefined) => {
+    if (!file) return;
+    importMutation.mutate(file, {
+      onSuccess: (res) => {
+        const summary = `Imported ${res.imported}, updated ${res.updated}, skipped ${res.skipped}.`;
+        if (res.errors.length > 0) {
+          toast.error(summary, { description: res.errors.slice(0, 5).join("\n") });
+        } else {
+          toast.success(summary);
+        }
+      },
+      onError: (e) => handleApiError(e),
+    });
+  };
+
+  const handleTemplate = async () => {
+    try {
+      await downloadProductTemplate();
+    } catch (e) {
+      handleApiError(e);
+    }
   };
 
   const columns: Column<Product>[] = [
@@ -105,11 +139,38 @@ export default function ProductList() {
         title="Product List"
         description="All stocked items for this branch"
         actions={
-          <Button asChild>
-            <Link to="/products/new">
-              <Plus className="size-4" /> Add Product
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            {canManage && (
+              <>
+                <input
+                  ref={fileInput}
+                  type="file"
+                  accept=".xlsx"
+                  className="hidden"
+                  onChange={(e) => {
+                    handleFile(e.target.files?.[0]);
+                    e.target.value = "";
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => fileInput.current?.click()}
+                  disabled={importMutation.isPending}
+                >
+                  <Upload className="size-4" />
+                  {importMutation.isPending ? "Importing…" : "Import"}
+                </Button>
+                <Button variant="ghost" onClick={handleTemplate}>
+                  <Download className="size-4" /> Template
+                </Button>
+              </>
+            )}
+            <Button asChild>
+              <Link to="/products/new">
+                <Plus className="size-4" /> Add Product
+              </Link>
+            </Button>
+          </div>
         }
       />
 

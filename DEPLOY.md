@@ -279,6 +279,39 @@ Confirm the response carries
 and `Content-Disposition: attachment; filename=...xlsx`, and that `audit.xlsx`
 is a non-empty spreadsheet.
 
+### Account, import, and admin endpoints
+
+```
+# Password recovery (public) — same generic reply for known and unknown emails
+curl -s -X POST http://127.0.0.1:8000/api/auth/forgot-password \
+  -H 'Content-Type: application/json' -d '{"email":"admin@store.test"}'
+
+# Profile + password change (auth:sanctum)
+curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/api/auth/profile
+curl -s -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  http://127.0.0.1:8000/api/auth/change-password \
+  -d '{"current_password":"secret123","new_password":"newsecret123"}'
+
+# Bulk product import + blank template (admin|supervisor)
+curl -s -H "Authorization: Bearer $TOKEN" \
+  -F "file=@products.xlsx;type=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" \
+  http://127.0.0.1:8000/api/products/import
+# expect {"imported":N,"updated":N,"skipped":N,"errors":[...]}
+curl -s -o template.xlsx -D - -H "Authorization: Bearer $TOKEN" \
+  http://127.0.0.1:8000/api/products/import/template
+
+# Customers (any signed-in staff) and devices + branches (admin|supervisor)
+curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/api/customers
+curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/api/devices
+curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/api/branches
+```
+
+The import returns a `{imported, updated, skipped, errors}` summary; `errors`
+lists per-row failures (a row with a bad date or non-numeric quantity is
+skipped, not aborting the batch). Each product line also writes a consignment
+row and opens the day's stock card, so a re-import of the same barcode adds to
+the existing stock rather than duplicating it.
+
 ### SPA shell
 
 ```

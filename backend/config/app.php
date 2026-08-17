@@ -56,6 +56,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Frontend URL
+    |--------------------------------------------------------------------------
+    |
+    | The SPA's origin. The API is consumed by a separate React frontend, so
+    | links that must land in the browser (password-reset emails) point here
+    | rather than at the API's own APP_URL.
+    |
+    */
+
+    'frontend_url' => rtrim((string) env('APP_FRONTEND_URL', env('APP_URL', 'http://localhost')), '/'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

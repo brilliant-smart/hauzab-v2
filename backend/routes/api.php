@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AuditLogController;
+use App\Http\Controllers\Api\BranchController;
 use App\Http\Controllers\Api\ConsignmentController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DashboardController;
@@ -22,6 +23,8 @@ use Illuminate\Support\Facades\Route;
 
 // Public auth endpoints.
 Route::post('/auth/login', [AuthController::class, 'login']);
+Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);
+Route::post('/auth/reset-password', [AuthController::class, 'resetPassword']);
 
 // Cloud receive endpoints — machine-to-machine, guarded by X-Sync-Secret
 // rather than a cashier session, so they sit outside auth:sanctum.
@@ -33,6 +36,9 @@ Route::middleware('sync')->prefix('sync')->group(function () {
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
+    Route::post('/auth/change-password', [AuthController::class, 'changePassword']);
+    Route::get('/auth/profile', [AuthController::class, 'showProfile']);
+    Route::put('/auth/profile', [AuthController::class, 'updateProfile']);
 
     Route::get('/user', function (Request $request) {
         return $request->user();
@@ -42,6 +48,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('products', [ProductController::class, 'index']);
     Route::get('products/low-stock', [ProductController::class, 'lowStock']);
     Route::get('products/expiring', [ProductController::class, 'expiring']);
+    // Registered before the {product} wildcard so "import" isn't bound as an id.
+    Route::get('products/import/template', [ProductController::class, 'importTemplate'])
+        ->middleware('role:admin|supervisor');
     Route::get('products/{product}', [ProductController::class, 'show']);
 
     Route::get('product-units', [ProductUnitController::class, 'index']);
@@ -58,6 +67,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Catalog and employee management — admins and supervisors only.
     Route::middleware('role:admin|supervisor')->group(function () {
         Route::post('products', [ProductController::class, 'store']);
+        Route::post('products/import', [ProductController::class, 'import']);
         Route::put('products/{product}', [ProductController::class, 'update']);
         Route::patch('products/{product}', [ProductController::class, 'update']);
         Route::delete('products/{product}', [ProductController::class, 'destroy']);
@@ -69,9 +79,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::apiResource('users', UserController::class);
 
-        // Device (till/tablet) administration.
-        Route::get('devices', [DeviceController::class, 'index']);
-        Route::post('devices', [DeviceController::class, 'store']);
+        // Branch list for the Devices form + device (till/tablet) administration.
+        Route::get('branches', [BranchController::class, 'index']);
+        Route::apiResource('devices', DeviceController::class);
 
         // Voiding a completed sale is a manager action.
         Route::post('orders/{order}/void', [OrderController::class, 'void']);

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\Role;
+use App\Notifications\ResetPasswordNotification;
 use App\Traits\BelongsToTenant;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -60,5 +61,14 @@ class User extends Authenticatable
     public function isAtLeast(Role $role): bool
     {
         return $this->role?->can($role) ?? false;
+    }
+
+    /**
+     * Route password-reset links to the SPA via our own notification, which
+     * builds a frontend URL carrying the broker token + email.
+     */
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new ResetPasswordNotification($token));
     }
 }

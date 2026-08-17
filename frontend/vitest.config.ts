@@ -22,6 +22,10 @@ export default defineConfig({
         'src/app/pos/useCart.ts',
         'src/components/DataTable.tsx',
         'src/app/pos/ReceiptDialog.tsx',
+        'src/app/pages/ForgotPassword.tsx',
+        'src/app/pages/Settings.tsx',
+        'src/app/pages/customers/CustomerList.tsx',
+        'src/app/pages/devices/DeviceList.tsx',
       ],
       exclude: [
         'src/**/*.d.ts',

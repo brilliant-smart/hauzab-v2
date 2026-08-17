@@ -20,6 +20,8 @@ export interface User {
   branch_id?: number | null;
   tenant?: Tenant | null;
   branch?: Branch | null;
+  email_verified_at?: string | null;
+  is_active?: boolean;
 }
 
 export interface AuthState {

@@ -1,6 +1,8 @@
 import { lazy } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import Login from "@/app/pages/Login";
+import ForgotPassword from "@/app/pages/ForgotPassword";
+import ResetPassword from "@/app/pages/ResetPassword";
 import Unauthorized from "@/app/pages/Unauthorized";
 import NotFound from "@/app/pages/NotFound";
 import AppLayout from "@/app/layouts/AppLayout";
@@ -11,7 +13,8 @@ import { homePathFor } from "@/app/auth/guards";
 
 // Page-level routes are code-split. The Suspense boundary lives in AppLayout
 // (around <Outlet/>), so every routed page beneath it lazy-loads without a
-// flash. Login and Unauthorized render outside AppLayout and stay eager.
+// flash. Login, Unauthorized, and the password-recovery pages render outside
+// AppLayout and stay eager.
 const Dashboard = lazy(() => import("@/app/pages/Dashboard"));
 const ProductList = lazy(() => import("@/app/pages/products/ProductList"));
 const ProductForm = lazy(() => import("@/app/pages/products/ProductForm"));
@@ -34,6 +37,9 @@ const StaffSales = lazy(() => import("@/app/pages/reports/StaffSales"));
 const ConsignmentList = lazy(() => import("@/app/pages/consignments/ConsignmentList"));
 const ConsignmentForm = lazy(() => import("@/app/pages/consignments/ConsignmentForm"));
 const ActivityLog = lazy(() => import("@/app/pages/audit/ActivityLog"));
+const CustomerList = lazy(() => import("@/app/pages/customers/CustomerList"));
+const DeviceList = lazy(() => import("@/app/pages/devices/DeviceList"));
+const Settings = lazy(() => import("@/app/pages/Settings"));
 
 const MANAGER_ROLES = ["admin", "supervisor"] as const;
 
@@ -41,6 +47,8 @@ export default function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/unauthorized" element={<Unauthorized />} />
 
       <Route
@@ -156,6 +164,19 @@ export default function AppRoutes() {
           }
         />
 
+        {/* Customers — any signed-in staff member (matches backend). */}
+        <Route path="/customers" element={<CustomerList />} />
+
+        {/* Devices — admin|supervisor. */}
+        <Route
+          path="/devices"
+          element={
+            <RoleProtectedRoute allowedRoles={[...MANAGER_ROLES]}>
+              <DeviceList />
+            </RoleProtectedRoute>
+          }
+        />
+
         {/* Expenses — admin|supervisor */}
         <Route
           path="/expense-categories"
@@ -235,6 +256,9 @@ export default function AppRoutes() {
             </RoleProtectedRoute>
           }
         />
+
+        {/* Settings — self-service for every signed-in user. */}
+        <Route path="/settings" element={<Settings />} />
       </Route>
 
       <Route path="/" element={<HomeRedirect />} />
