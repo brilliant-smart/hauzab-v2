@@ -5,14 +5,12 @@ namespace Tests\Feature;
 use App\Enums\Role;
 use App\Models\AuditLog;
 use App\Models\Product;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Tests\TenancyHelpers;
 use Tests\TestCase;
 
 class AuditLogTest extends TestCase
 {
-    use RefreshDatabase;
     use TenancyHelpers;
 
     public function test_record_resolves_tenant_and_user_from_the_auth_context(): void

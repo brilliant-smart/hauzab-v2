@@ -1,9 +1,8 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { AxiosError } from "axios";
-import { Minus, Plus, Search, X } from "lucide-react";
+import { Minus, Plus, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useProducts } from "@/app/api/catalog";
 import { useCustomers } from "@/app/api/customers";
 import { orderKeys } from "@/app/api/orders";
 import {
@@ -13,11 +12,12 @@ import {
   ProvisionalOrder,
   ReceiptOrder,
 } from "@/app/api/types";
-import { api } from "@/app/lib/api";
 import { outboxApi, OutboxAuthError } from "@/app/lib/outboxApi";
 import { handleApiError } from "@/app/lib/errorHandler";
 import { formatCurrency } from "@/app/lib/format";
 import { useCart } from "@/app/pos/useCart";
+import { useProductScanSearch } from "@/app/pos/useProductScanSearch";
+import { ProductScanSearchField } from "@/app/pos/ProductScanSearchField";
 import { ReceiptDialog } from "@/app/pos/ReceiptDialog";
 import { useOutbox } from "@/app/offline/useOutbox";
 import { device } from "@/app/offline/device";
@@ -27,14 +27,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -68,8 +60,6 @@ function newUuid(): string {
 
 export default function MakeSale() {
   const { user } = useAuth();
-  const [search, setSearch] = useState("");
-  const [scan, setScan] = useState("");
   const [customerId, setCustomerId] = useState<string>("");
   const [discount, setDiscount] = useState(0);
   const [paymentOpen, setPaymentOpen] = useState(false);
@@ -80,33 +70,21 @@ export default function MakeSale() {
   const cart = useCart();
   const outbox = useOutbox();
   const qc = useQueryClient();
-  const { data: productsData, isLoading } = useProducts({ search, per_page: 25 });
   const { data: customersData, isLoading: customersLoading } = useCustomers({ per_page: 50 });
 
-  const products = productsData?.data ?? [];
-
-  const handleScan = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const code = scan.trim();
-    if (!code) return;
-    try {
-      const { data } = await api.get<{ data: Product[] }>("products", {
-        params: { search: code, per_page: 5 },
-      });
-      const exact = data.data.find((p) => p.barcode === code);
-      const match = exact ?? data.data[0];
-      if (match) {
-        cart.add(match);
-        toast.success(`Added ${match.name}`);
-      } else {
-        toast.error("No product matches that code");
-      }
-    } catch (err) {
-      handleApiError(err);
-    } finally {
-      setScan("");
+  // One field for both scanning and searching — see useProductScanSearch.
+  const handleAdd = (p: Product) => {
+    if (Number(p.quantity) <= 0) {
+      toast.error(`${p.name} is out of stock`);
+      return;
     }
+    cart.add(p);
+    toast.success(`Added ${p.name}`);
   };
+  const handleNotFound = (code: string) => {
+    toast.error(`No product matches "${code}"`);
+  };
+  const scan = useProductScanSearch({ onSelect: handleAdd, onNotFound: handleNotFound });
 
   const total = Math.max(0, cart.subtotal - discount);
 
@@ -171,6 +149,7 @@ export default function MakeSale() {
       uuid,
       items: cart.items.map((l) => ({
         product_id: l.productId,
+        product_name: l.name,
         quantity: l.qty,
         unit_price: l.price,
       })),
@@ -256,82 +235,16 @@ export default function MakeSale() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Make Sale" description="Scan or pick items, then tender payment" />
+      <PageHeader title="Make Sale" />
 
       <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
-        {/* Product picker */}
-        <div className="space-y-3">
-          <form onSubmit={handleScan} className="flex gap-2">
-            <Input
-              placeholder="Scan barcode and press Enter…"
-              value={scan}
-              onChange={(e) => setScan(e.target.value)}
-              className="max-w-xs"
-              autoFocus
-            />
-            <Button type="submit" variant="secondary">Add</Button>
-          </form>
-
-          <Input
-            placeholder="Search products…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="max-w-sm"
-          />
-
-          <div className="overflow-x-auto rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Product</TableHead>
-                  <TableHead className="text-right">Stock</TableHead>
-                  <TableHead className="text-right">Price</TableHead>
-                  <TableHead className="w-10" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading && (
-                  <TableRow>
-                    <TableCell colSpan={4} className="h-20 text-center text-muted-foreground">Loading…</TableCell>
-                  </TableRow>
-                )}
-                {!isLoading && products.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={4} className="h-20 text-center text-muted-foreground">No products</TableCell>
-                  </TableRow>
-                )}
-                {products.map((p) => {
-                  const out = Number(p.quantity) <= 0;
-                  return (
-                    <TableRow key={p.id}>
-                      <TableCell>
-                        <div className="font-medium">{p.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {[p.size, p.barcode].filter(Boolean).join(" · ")}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">{p.quantity}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(p.selling_price)}</TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          disabled={out}
-                          onClick={() => cart.add(p)}
-                        >
-                          <Plus className="size-4" /> Add
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+        {/* Product picker — scan or search in one field. */}
+        <div className="space-y-2">
+          <ProductScanSearchField scan={scan} />
         </div>
 
         {/* Cart */}
-        <div className="space-y-3 rounded-md border bg-card p-4">
+        <div className="space-y-3 rounded-lg border bg-card p-4 shadow-sm">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold">Cart ({cart.count})</h2>
             {cart.items.length > 0 && (
@@ -368,7 +281,7 @@ export default function MakeSale() {
           <div className="max-h-[40vh] space-y-2 overflow-y-auto">
             {cart.items.length === 0 && (
               <p className="py-6 text-center text-sm text-muted-foreground">
-                Cart is empty. Scan or add a product.
+                Cart is empty. Scan or search to add a product.
               </p>
             )}
             {cart.items.map((line) => (

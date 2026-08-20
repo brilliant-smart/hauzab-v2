@@ -23,6 +23,53 @@ class AuditLog extends Model
         'properties' => 'array',
     ];
 
+    /**
+     * Human-readable labels for each recorded action — plain past-tense English
+     * so the audit trail and its Excel export read as events, not developer
+     * codes. Mirrors the frontend ActivityLog ACTION_META labels; keep both in
+     * sync when an action is added. Unknown actions fall back to the raw code.
+     */
+    private const LABELS = [
+        'auth.login' => 'Signed in',
+        'auth.logout' => 'Signed out',
+        'auth.password-change' => 'Password changed',
+        'auth.password-reset' => 'Password reset',
+
+        'product.created' => 'Product added',
+        'product.updated' => 'Product updated',
+        'product.deleted' => 'Product deleted',
+        'product.imported' => 'Products imported',
+        'consignment.created' => 'Stock received',
+        'consignment.updated' => 'Stock receipt updated',
+        'consignment.deleted' => 'Stock receipt deleted',
+
+        'order.created' => 'Sale recorded',
+        'order.voided' => 'Sale voided',
+
+        'expense.created' => 'Expense added',
+        'expense.updated' => 'Expense updated',
+        'expense.deleted' => 'Expense deleted',
+        'expense_category.created' => 'Expense category added',
+        'expense_category.updated' => 'Expense category updated',
+        'expense_category.deleted' => 'Expense category deleted',
+
+        'user.created' => 'Employee added',
+        'user.updated' => 'Employee updated',
+        'device.created' => 'Device added',
+        'device.updated' => 'Device updated',
+        'device.deleted' => 'Device removed',
+
+        'sync.received' => 'Sale synced in',
+        'sync.pushed' => 'Sale synced out',
+        'sync.voided' => 'Void synced in',
+        'sync.failed' => 'Sync failed',
+    ];
+
+    public static function label(string $action): string
+    {
+        return self::LABELS[$action] ?? $action;
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

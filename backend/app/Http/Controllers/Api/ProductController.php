@@ -14,12 +14,14 @@ use App\Models\ProductUnit;
 use App\Services\StockLedger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use PhpOffice\PhpSpreadsheet\Reader\Xlsx as XlsxReader;
 use PhpOffice\PhpSpreadsheet\Shared\Date as SpreadsheetDate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class ProductController extends Controller
@@ -54,6 +56,12 @@ class ProductController extends Controller
         $data['tenant_id'] = $request->user()->tenant_id;
         $user = $request->user();
 
+        // The image field is the stored path returned by uploadImage(); leave
+        // any stale string alone and only keep a path under products/.
+        if (! empty($data['image']) && ! str_starts_with((string) $data['image'], 'products/')) {
+            unset($data['image']);
+        }
+
         $product = DB::transaction(function () use ($data, $user) {
             $product = Product::create($data);
 
@@ -66,6 +74,10 @@ class ProductController extends Controller
 
             return $product;
         });
+
+        // Reload so DB-applied defaults (reorder_level, is_active) the create
+        // payload omitted are reflected in the response, not left null.
+        $product->refresh();
 
         return (new ProductResource($product->load(['category', 'unit', 'manufacturer', 'supplier'])))
             ->response()
@@ -140,6 +152,23 @@ class ProductController extends Controller
     }
 
     /**
+     * Accept a product image upload, store it on the public disk, and return
+     * the stored path plus a displayable URL. The path is what the product
+     * form later sends back as the `image` field.
+     */
+    public function uploadImage(Request $request): JsonResponse
+    {
+        $request->validate(['file' => ['required', 'image', 'max:2048']]);
+
+        $path = $request->file('file')->store('products', 'public');
+
+        return response()->json([
+            'path' => $path,
+            'url' => asset('storage/'.$path),
+        ]);
+    }
+
+    /**
      * Bulk-import products from an .xlsx spreadsheet. Reads by header name
      * (not positionally), dedupes by barcode within the tenant, opens each
      * product's stock card, and writes a consignment row per imported line.
@@ -178,7 +207,7 @@ class ProductController extends Controller
             'selling_price' => ['selling price', 'selling_price'],
             'department' => ['department', 'product department'],
             'reorder_level' => ['reorder level', 'order level', 'reorder_level'],
-            'expire_date' => ['expire date', 'expiry date', 'prod expired date', 'expire_date'],
+            'expire_date' => ['expire date', 'expiry date', 'prod expired date', 'produc expired date', 'expire_date'],
             'manufacture_date' => ['manufacture date', 'manufacture_date'],
             'category' => ['category', 'product category'],
             'unit' => ['unit', 'product unit'],
@@ -301,21 +330,41 @@ class ProductController extends Controller
     }
 
     /**
-     * Download a blank .xlsx template with the import headers and a sample row.
+     * Download a blank .xlsx template with the import headers.
+     *
+     * Headers mirror the legacy hauzab-product-template.xlsx exactly — same
+     * columns, order, wording, and the original "PRODUC EXPIRED DATE" spelling
+     * — so existing import spreadsheets keep working unchanged.
      */
     public function importTemplate()
     {
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->fromArray([
-            ['Barcode', 'Name', 'Size', 'Quantity', 'Cost Price', 'Selling Price', 'Department', 'Reorder Level', 'Expire Date', 'Category', 'Unit', 'Manufacturer', 'Supplier'],
-            ['5012345678900', 'Sample Product', '500g', 100, 80, 120, 'Aisle 3', 10, '2027-01-31', 'Groceries', 'Carton', 'ACME', 'Northside Supply'],
+            ['BAR CODE NUMBER', 'PRODUCTS NAME', 'PRODUCT SIZES', 'PRODUCT QTY', 'PURCHASE PRICE', 'SELLING PRICE', 'PRODUCT DEPARTMENT', 'ORDER LEVEL', 'PRODUC EXPIRED DATE'],
         ], null, 'A1');
+
+        // Header row styled like the legacy template: bold text, a thin outline
+        // border on every cell, and each column auto-sized to fit its header.
+        $lastCol = $sheet->getHighestColumn();
+        $sheet->getStyle("A1:{$lastCol}1")->applyFromArray([
+            'font' => ['bold' => true],
+            'borders' => [
+                'allBorders' => ['borderStyle' => Border::BORDER_THIN],
+            ],
+        ]);
+        foreach (range('A', $lastCol) as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
 
         $temp = tempnam(sys_get_temp_dir(), 'import-template') . '.xlsx';
         (new Xlsx($spreadsheet))->save($temp);
 
-        return response()->download($temp, 'hauzab-product-template.xlsx', [
+        // Stamp the generation date so repeated downloads don't overwrite
+        // each other as hauzab-product-template.xlsx.
+        $name = 'hauzab-product-template-' . Carbon::today()->toDateString() . '.xlsx';
+
+        return response()->download($temp, $name, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ])->deleteFileAfterSend();
     }
@@ -411,7 +460,7 @@ class ProductController extends Controller
     {
         $tenantId = $request->user()->tenant_id;
 
-        return $request->validate([
+        $data = $request->validate([
             'name' => ['required', 'string', 'max:191'],
             'description' => ['nullable', 'string'],
             'size' => ['nullable', 'string', 'max:120'],
@@ -431,5 +480,15 @@ class ProductController extends Controller
             'expire_date' => ['nullable', 'date'],
             'is_active' => ['boolean'],
         ]);
+
+        // reorder_level is NOT NULL (column default 1); a blank form field
+        // arrives as null (or is omitted). Drop it so the insert lets the
+        // column default apply on create, and an edit preserves the existing
+        // value — never send null into a NOT NULL column.
+        if (($data['reorder_level'] ?? null) === null) {
+            unset($data['reorder_level']);
+        }
+
+        return $data;
     }
 }

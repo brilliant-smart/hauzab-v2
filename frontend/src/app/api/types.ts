@@ -25,6 +25,7 @@ export interface Product {
   department?: string | null;
   barcode?: string | null;
   image?: string | null;
+  image_url?: string | null;
   quantity: string;
   cost_price: string;
   selling_price: string;
@@ -167,7 +168,7 @@ export interface Order {
 
 export interface CreateOrderPayload {
   uuid: string;
-  items: { product_id: number; quantity: number; unit_price: number }[];
+  items: { product_id: number; product_name?: string; quantity: number; unit_price: number }[];
   discount?: number;
   payments: { method: PaymentMethodValue; amount: number }[];
   customer_id?: number | null;
@@ -305,6 +306,7 @@ export interface AuditLogEntry {
 export interface DashboardSummary {
   today: { count: number; total: string };
   week: { count: number; total: string };
+  month: { count: number; total: string };
   year: { count: number; total: string };
   monthly_expense: string;
   products_count: number;
@@ -313,8 +315,51 @@ export interface DashboardSummary {
   employees_count: number;
 }
 
+export interface DashboardChartRange {
+  days: number;
+  from: string;
+  to: string;
+}
+
+export interface SalesTrendPoint {
+  date: string;
+  label: string;
+  total: string;
+  count: number;
+}
+
+export interface TopProductPoint {
+  name: string;
+  quantity: string;
+  revenue: string;
+}
+
+export interface PaymentMixPoint {
+  method: string;
+  label: string;
+  total: string;
+}
+
+export interface AttentionItem {
+  id: number;
+  name: string;
+  quantity: string;
+  reorder_level?: string;
+  expire_date?: string | null;
+}
+
+export interface DashboardCharts {
+  range: DashboardChartRange;
+  sales_trend: SalesTrendPoint[];
+  top_products: TopProductPoint[];
+  payment_mix: PaymentMixPoint[];
+  low_stock: AttentionItem[];
+  expiring: AttentionItem[];
+}
+
 export const ROLE_OPTIONS: { value: Role; label: string }[] = [
   { value: "admin", label: "Admin" },
   { value: "supervisor", label: "Supervisor" },
+  { value: "inventory_manager", label: "Inventory Manager" },
   { value: "staff", label: "Staff" },
 ];

@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 const ROLE_LABEL: Record<Employee["role"], string> = {
   admin: "Admin",
   supervisor: "Supervisor",
+  inventory_manager: "Inventory Manager",
   staff: "Staff",
 };
 

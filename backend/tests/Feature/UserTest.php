@@ -4,13 +4,11 @@ namespace Tests\Feature;
 
 use App\Enums\Role;
 use App\Models\UserProfile;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TenancyHelpers;
 use Tests\TestCase;
 
 class UserTest extends TestCase
 {
-    use RefreshDatabase;
     use TenancyHelpers;
 
     public function test_an_admin_creates_a_user_with_a_profile_in_one_transaction(): void

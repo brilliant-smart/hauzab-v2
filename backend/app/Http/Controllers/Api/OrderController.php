@@ -39,6 +39,10 @@ class OrderController extends Controller
                     ->orWhere('customer_name', 'like', "%{$term}%"));
             })
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
+            // Optional date-range filter (legacy sales history defaults to
+            // today and queries an explicit From/To range).
+            ->when($request->filled('from'), fn ($q) => $q->whereDate('created_at', '>=', $request->string('from')))
+            ->when($request->filled('to'), fn ($q) => $q->whereDate('created_at', '<=', $request->string('to')))
             // Front-line staff only see their own sales; supervisors and
             // admins see the whole branch's register activity.
             ->when(! $user->isAtLeast(Role::Supervisor), fn ($q) => $q->where('user_id', $user->id))

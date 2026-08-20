@@ -6,13 +6,11 @@ use App\Enums\OrderStatus;
 use App\Enums\Role;
 use App\Models\Order;
 use App\Models\Product;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TenancyHelpers;
 use Tests\TestCase;
 
 class SyncTest extends TestCase
 {
-    use RefreshDatabase;
     use TenancyHelpers;
 
     protected function setUp(): void

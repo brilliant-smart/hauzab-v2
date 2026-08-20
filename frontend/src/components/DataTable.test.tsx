@@ -66,7 +66,9 @@ describe("DataTable", () => {
       />,
     );
     expect(screen.getByText(/Showing 4–6 of 9/)).toBeInTheDocument();
-    expect(screen.getByText("2 / 3")).toBeInTheDocument();
+    // Numbered page buttons render; the current page (2) is shown as a button.
+    expect(screen.getByRole("button", { name: "2" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "3" })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /next/i }));
     expect(onPageChange).toHaveBeenLastCalledWith(3);

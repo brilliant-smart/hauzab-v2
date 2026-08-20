@@ -33,7 +33,7 @@ const baseSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Valid email required"),
   password: z.string().optional(),
-  role: z.enum(["admin", "supervisor", "staff"]),
+  role: z.enum(["admin", "supervisor", "inventory_manager", "staff"]),
   is_active: z.boolean(),
   fullname: z.string().optional(),
   gender: z.string().optional(),

@@ -20,6 +20,9 @@ backend/public/index.html
 backend/public/assets
 backend/public/build
 backend/public/favicon.*
+backend/public/favicon-*.png
+backend/public/apple-touch-*.png
+backend/public/logo.png
 # PWA service-worker + manifest emitted by the frontend build (artifacts).
 backend/public/sw.js
 backend/public/workbox-*.js

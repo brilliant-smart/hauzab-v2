@@ -21,17 +21,17 @@ class DatabaseSeeder extends Seeder
     {
         $tenants = [
             [
-                'name' => 'Hauzab Supermarket',
+                'name' => 'Hauzab Super Market',
                 'slug' => 'supermarket',
-                'address' => '12 Market Road, Lagos',
-                'phone' => '0801 234 5678',
+                'address' => 'No. 2 Gubi Dam Junction Along Gida 1000 Units Housing Estate Opp. Assalam Clinic Tudun Salmanu Bauchi.',
+                'phone' => '08082447103, 07010080435',
                 'email' => 'sales@hauzabsupermarket.com',
             ],
             [
                 'name' => 'Hauzab Pharmacy',
                 'slug' => 'pharmacy',
-                'address' => '5 Health Avenue, Ibadan',
-                'phone' => '0802 987 6543',
+                'address' => 'No. 2 Gubi Dam Junction Along Gida 1000 Units Housing Estate Opp. Assalam Clinic Tudun Salmanu Bauchi.',
+                'phone' => '08082447103, 07010080435',
                 'email' => 'care@hauzabpharmacy.com',
             ],
         ];

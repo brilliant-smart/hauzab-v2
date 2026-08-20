@@ -6,6 +6,7 @@ const ROLE_HOME: Record<Role, string> = {
   admin: "/dashboard",
   supervisor: "/dashboard",
   staff: "/dashboard",
+  inventory_manager: "/products",
 };
 
 interface Props {

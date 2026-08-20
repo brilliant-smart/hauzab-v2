@@ -7,77 +7,116 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Design tokens. Indigo is the brand primary — retune --primary to rebrand.
+ * Neutrals are a cool slate ramp; semantic tones carry their own foreground
+ * pair so text always meets contrast on either theme. Shadows are layered and
+ * soft rather than hard-edged. Everything else reads these variables.
+ */
 @layer base {
   :root {
+    color-scheme: light;
+
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 222 47% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    /* Brand primary — deep indigo. Retune this one token to rebrand. */
+    --popover-foreground: 222 47% 11%;
+
     --primary: 243 75% 59%;
     --primary-foreground: 0 0% 100%;
+
     --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary-foreground: 222 47% 11%;
     --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 226 100% 97%;
-    --accent-foreground: 243 75% 45%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --muted-foreground: 215 16% 47%;
+
+    /* Subtle indigo wash for hover/selected surfaces — ties the palette together. */
+    --accent: 243 70% 97%;
+    --accent-foreground: 243 75% 43%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
+    --info: 199 89% 42%;
+    --info-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
-    --warning-foreground: 32 95% 8%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    --warning-foreground: 28 100% 12%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
     --ring: 243 75% 59%;
     --radius: 0.5rem;
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-background: 210 20% 98%;
+    --sidebar-foreground: 215 16% 33%;
     --sidebar-primary: 243 75% 59%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 226 100% 97%;
-    --sidebar-accent-foreground: 243 75% 45%;
-    --sidebar-border: 220 13% 91%;
+    --sidebar-accent: 243 70% 97%;
+    --sidebar-accent-foreground: 243 75% 43%;
+    --sidebar-border: 220 14% 91%;
     --sidebar-ring: 243 75% 59%;
+
+    /* Categorical chart palette — indigo leads (matches the brand primary),
+     * with teal, amber, rose and violet for distinguishable series in either
+     * theme. Read via the shadcn ChartContainer `--color-*` convention. */
+    --chart-1: 243 75% 59%;
+    --chart-2: 173 80% 40%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 0 72% 51%;
+    --chart-5: 265 80% 60%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    color-scheme: dark;
+
+    --background: 222 26% 7%;
     --foreground: 210 40% 98%;
-    --card: 222.2 47% 8%;
+    --card: 222 26% 10%;
     --card-foreground: 210 40% 98%;
-    --popover: 222.2 47% 8%;
+    --popover: 222 26% 10%;
     --popover-foreground: 210 40% 98%;
+
     --primary: 243 75% 59%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 243 75% 75%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --success: 142 71% 45%;
-    --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 32 95% 8%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 243 75% 75%;
 
-    --sidebar-background: 222.2 47% 7%;
-    --sidebar-foreground: 240 4.8% 95.9%;
+    --secondary: 222 20% 15%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 222 20% 15%;
+    --muted-foreground: 220 14% 63%;
+
+    --accent: 243 30% 18%;
+    --accent-foreground: 243 80% 82%;
+
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 70% 50%;
+    --success-foreground: 0 0% 100%;
+    --info: 200 90% 55%;
+    --info-foreground: 0 0% 100%;
+    --warning: 38 92% 55%;
+    --warning-foreground: 28 100% 12%;
+
+    --border: 222 18% 18%;
+    --input: 222 18% 18%;
+    --ring: 243 75% 67%;
+
+    --sidebar-background: 222 26% 8%;
+    --sidebar-foreground: 220 14% 88%;
     --sidebar-primary: 243 75% 59%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217.2 32.6% 17.5%;
-    --sidebar-accent-foreground: 243 75% 75%;
-    --sidebar-border: 217.2 32.6% 17.5%;
-    --sidebar-ring: 243 75% 75%;
+    --sidebar-accent: 243 30% 18%;
+    --sidebar-accent-foreground: 243 80% 82%;
+    --sidebar-border: 222 18% 16%;
+    --sidebar-ring: 243 75% 67%;
+
+    --chart-1: 243 75% 67%;
+    --chart-2: 173 70% 50%;
+    --chart-3: 38 92% 55%;
+    --chart-4: 0 70% 62%;
+    --chart-5: 265 80% 70%;
   }
 }
 
@@ -89,5 +128,37 @@
     @apply bg-background text-foreground;
     font-family: "DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  /* Align numeric columns so figures stack cleanly in tables/reports. */
+  table {
+    font-variant-numeric: tabular-nums;
+  }
+  /* Branded selection highlight. */
+  ::selection {
+    background-color: hsl(var(--primary) / 0.18);
+  }
+  /* Quiet, themed scrollbars. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.35) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.5);
   }
 }

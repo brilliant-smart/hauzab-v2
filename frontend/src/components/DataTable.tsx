@@ -1,8 +1,16 @@
 import { ReactNode } from "react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ChevronLeft, ChevronRight, AlertCircle, Inbox } from "lucide-react";
+import { pageList } from "@/components/pagination";
 
 export interface Column<T> {
   key: string;
@@ -24,8 +32,15 @@ interface Props<T> {
   from?: number;
   to?: number;
   onPageChange?: (page: number) => void;
+  perPage?: number;
+  perPageOptions?: number[];
+  onPerPageChange?: (perPage: number) => void;
   emptyMessage?: string;
+  /** Optional total row rendered as a table footer (only when rows are shown). */
+  footer?: ReactNode;
 }
+
+const DEFAULT_PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
 export function DataTable<T>({
   columns,
@@ -40,11 +55,37 @@ export function DataTable<T>({
   from,
   to,
   onPageChange,
+  perPage,
+  perPageOptions = DEFAULT_PER_PAGE_OPTIONS,
+  onPerPageChange,
   emptyMessage = "No records found.",
+  footer,
 }: Props<T>) {
   return (
     <div className="space-y-3">
-      <div className="rounded-md border bg-card">
+      {onPerPageChange && (
+        <div className="flex items-center text-sm text-muted-foreground">
+          <span className="mr-2">Show</span>
+          <Select
+            value={String(perPage ?? perPageOptions[0])}
+            onValueChange={(v) => onPerPageChange(Number(v))}
+          >
+            <SelectTrigger className="h-8 w-[80px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {perPageOptions.map((n) => (
+                <SelectItem key={n} value={String(n)}>
+                  {n}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span className="ml-2">entries</span>
+        </div>
+      )}
+
+      <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
         <Table>
           <TableHeader>
             <TableRow>
@@ -58,7 +99,7 @@ export function DataTable<T>({
           <TableBody>
             {error ? (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
+                <TableCell colSpan={columns.length} className="h-24 bg-destructive/5 text-center">
                   <div className="flex flex-col items-center gap-2 text-muted-foreground">
                     <AlertCircle className="size-5 text-destructive" />
                     <span>Couldn't load this data.</span>
@@ -82,8 +123,11 @@ export function DataTable<T>({
               ))
             ) : data.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
-                  {emptyMessage}
+                <TableCell colSpan={columns.length} className="h-32 text-center">
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <Inbox className="size-6 opacity-40" />
+                    <span>{emptyMessage}</span>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (
@@ -98,17 +142,20 @@ export function DataTable<T>({
               ))
             )}
           </TableBody>
+          {footer && !error && !loading && data.length > 0 && (
+            <TableFooter>{footer}</TableFooter>
+          )}
         </Table>
       </div>
 
       {onPageChange && !error && !loading && (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm text-muted-foreground">
           <span>
             {total != null && total > 0
               ? `Showing ${from ?? 0}–${to ?? 0} of ${total}`
               : ""}
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <Button
               variant="outline"
               size="sm"
@@ -117,9 +164,23 @@ export function DataTable<T>({
             >
               <ChevronLeft className="size-4" /> Prev
             </Button>
-            <span>
-              {page ?? 1} / {lastPage ?? 1}
-            </span>
+            {pageList(page ?? 1, lastPage ?? 1).map((p, i) =>
+              p === "…" ? (
+                <span key={`e-${i}`} className="px-2 text-muted-foreground">
+                  …
+                </span>
+              ) : (
+                <Button
+                  key={p}
+                  variant={p === page ? "default" : "outline"}
+                  size="sm"
+                  className="min-w-9"
+                  onClick={() => onPageChange(p)}
+                >
+                  {p}
+                </Button>
+              ),
+            )}
             <Button
               variant="outline"
               size="sm"

@@ -3,147 +3,158 @@ import {
   AlertTriangle,
   Boxes,
   CalendarClock,
-  PackagePlus,
+  Banknote,
   Receipt,
   ShoppingCart,
-  TrendingUp,
-  Users,
   Wallet,
 } from "lucide-react";
 import { useAuth } from "@/app/auth/AuthContext";
 import { isAtLeast } from "@/app/auth/guards";
-import { useExpiring, useLowStock, useProducts } from "@/app/api/catalog";
 import { useDashboardSummary } from "@/app/api/dashboard";
-import { useEmployees } from "@/app/api/employees";
 import { useOrders } from "@/app/api/orders";
 import { formatCurrency } from "@/app/lib/format";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/PageHeader";
+import { DashboardCharts } from "@/app/pages/dashboard/DashboardCharts";
 
-function StatCard({
+type Tone = "success" | "secondary" | "warning" | "danger" | "info" | "primary" | "dark" | "violet";
+
+const TONES: Record<Tone, string> = {
+  success: "bg-gradient-to-br from-emerald-500 to-emerald-600",
+  secondary: "bg-gradient-to-br from-slate-500 to-slate-600",
+  warning: "bg-gradient-to-br from-amber-500 to-amber-600",
+  danger: "bg-gradient-to-br from-rose-500 to-rose-600",
+  info: "bg-gradient-to-br from-sky-500 to-sky-600",
+  primary: "bg-gradient-to-br from-blue-600 to-blue-700",
+  dark: "bg-gradient-to-br from-slate-800 to-slate-900",
+  violet: "bg-gradient-to-br from-violet-500 to-violet-600",
+};
+
+function ColorStatCard({
   title,
   value,
   icon: Icon,
-  hint,
+  tone,
   to,
   loading,
 }: {
   title: string;
-  value: number | string;
-  icon: typeof Boxes;
-  hint?: string;
+  value: string;
+  icon: typeof Banknote;
+  tone: Tone;
   to?: string;
   loading?: boolean;
 }) {
-  const body = (
-    <>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        <Icon className="size-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-semibold">
-          {loading ? <Skeleton className="h-7 w-24" /> : value}
+  const card = (
+    <div
+      className={`${TONES[tone]} rounded-lg text-white shadow-md ring-1 ring-black/5 transition-all hover:-translate-y-0.5 hover:shadow-lg`}
+    >
+      <div className="p-5">
+        <h5 className="text-sm font-medium text-white/85">{title}</h5>
+        <div className="mt-3 flex items-center gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-white/15 ring-1 ring-white/25">
+            <Icon className="size-5 text-white" />
+          </div>
+          <h6 className="text-xl font-semibold tabular-nums">
+            {loading ? <Skeleton className="h-7 w-24 bg-white/30" /> : value}
+          </h6>
         </div>
-        {hint && !loading && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
-      </CardContent>
-    </>
+      </div>
+    </div>
   );
 
   return to ? (
-    <Link to={to}>
-      <Card className="transition-colors hover:bg-accent/40">{body}</Card>
+    <Link to={to} className="block">
+      {card}
     </Link>
   ) : (
-    <Card>{body}</Card>
+    card
   );
 }
 
 function ManagerDashboard() {
-  const products = useProducts({ per_page: 1 });
-  const lowStock = useLowStock({ per_page: 1 });
-  const expiring = useExpiring({ per_page: 1 });
-  const employees = useEmployees({ per_page: 1 });
   const summary = useDashboardSummary();
 
+  const monthName = new Date().toLocaleString("en-GB", { month: "long" });
+  const year = new Date().getFullYear();
+
   return (
-    <>
+    <div className="space-y-4">
+      {/* Row 1: the four colored summary cards. */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Today's Sales"
+        <ColorStatCard
+          title="Today Sales"
           value={formatCurrency(summary.data?.today.total ?? 0)}
-          icon={TrendingUp}
-          hint={`${summary.data?.today.count ?? 0} sales`}
-          to="/reports/sales"
+          icon={Banknote}
+          tone="success"
+          to="/pos/history"
           loading={summary.isLoading}
         />
-        <StatCard
-          title="This Week"
-          value={formatCurrency(summary.data?.week.total ?? 0)}
-          icon={Receipt}
-          hint={`${summary.data?.week.count ?? 0} sales`}
-          to="/reports/sales"
-          loading={summary.isLoading}
-        />
-        <StatCard
-          title="This Year"
-          value={formatCurrency(summary.data?.year.total ?? 0)}
-          icon={ShoppingCart}
-          hint={`${summary.data?.year.count ?? 0} sales`}
-          to="/reports/sales"
-          loading={summary.isLoading}
-        />
-        <StatCard
-          title="Monthly Expense"
+        <ColorStatCard
+          title={`${monthName} Expense`}
           value={formatCurrency(summary.data?.monthly_expense ?? 0)}
           icon={Wallet}
+          tone="secondary"
           to="/expenses"
           loading={summary.isLoading}
         />
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Products" value={products.data?.total ?? 0} icon={Boxes} to="/products" loading={products.isLoading} />
-        <StatCard
-          title="Low Stock"
-          value={lowStock.data?.total ?? 0}
+        <ColorStatCard
+          title="Low in stock"
+          value={String(summary.data?.low_stock_count ?? 0)}
           icon={AlertTriangle}
-          hint="At or below reorder level"
+          tone="warning"
           to="/products/low-stock"
-          loading={lowStock.isLoading}
+          loading={summary.isLoading}
         />
-        <StatCard
-          title="Expiring Soon"
-          value={expiring.data?.total ?? 0}
+        <ColorStatCard
+          title="Product about to Expire"
+          value={String(summary.data?.expiring_count ?? 0)}
           icon={CalendarClock}
-          hint="Within 90 days"
+          tone="danger"
           to="/products/expiring"
-          loading={expiring.isLoading}
+          loading={summary.isLoading}
         />
-        <StatCard title="Employees" value={employees.data?.total ?? 0} icon={Users} to="/employees" loading={employees.isLoading} />
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <Button asChild>
-          <Link to="/pos">
-            <ShoppingCart className="size-4" /> Make Sale
-          </Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link to="/products/new">
-            <PackagePlus className="size-4" /> Add Product
-          </Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link to="/products">Product List</Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link to="/employees">Employee Record</Link>
-        </Button>
+      {/* Row 2: the three sales-period cards + the catalog count. */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <ColorStatCard
+          title="This Week Sales"
+          value={formatCurrency(summary.data?.week.total ?? 0)}
+          icon={Banknote}
+          tone="info"
+          to="/reports/sales"
+          loading={summary.isLoading}
+        />
+        <ColorStatCard
+          title={`${monthName} Sales`}
+          value={formatCurrency(summary.data?.month.total ?? 0)}
+          icon={Banknote}
+          tone="primary"
+          to="/reports/sales"
+          loading={summary.isLoading}
+        />
+        <ColorStatCard
+          title={`${year} Sales`}
+          value={formatCurrency(summary.data?.year.total ?? 0)}
+          icon={Banknote}
+          tone="dark"
+          to="/reports/sales"
+          loading={summary.isLoading}
+        />
+        <ColorStatCard
+          title="Total Products"
+          value={String(summary.data?.products_count ?? 0)}
+          icon={Boxes}
+          tone="violet"
+          to="/products"
+          loading={summary.isLoading}
+        />
       </div>
-    </>
+
+      {/* Row 3: trend + breakdown charts for the last 30 days. */}
+      <DashboardCharts />
+    </div>
   );
 }
 
@@ -151,36 +162,30 @@ function CashierDashboard() {
   const sales = useOrders({ per_page: 1 });
 
   return (
-    <>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Link to="/pos">
-          <Card className="transition-colors hover:bg-accent/40">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Open Register</CardTitle>
-              <ShoppingCart className="size-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-lg font-semibold">Make a sale</div>
-              <p className="mt-1 text-xs text-muted-foreground">Scan items and tender payment</p>
-            </CardContent>
-          </Card>
-        </Link>
-        <Link to="/pos/history">
-          <Card className="transition-colors hover:bg-accent/40">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Your Sales</CardTitle>
-              <Receipt className="size-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-semibold">
-                {sales.isLoading ? <Skeleton className="h-7 w-16" /> : sales.data?.total ?? 0}
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">Sales recorded on your account</p>
-            </CardContent>
-          </Card>
-        </Link>
-      </div>
-    </>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Link to="/pos">
+        <div className="rounded-lg border bg-card p-5 shadow-sm transition-colors hover:bg-accent/40">
+          <div className="flex items-center justify-between">
+            <h5 className="text-sm font-medium text-muted-foreground">Open Register</h5>
+            <ShoppingCart className="size-4 text-muted-foreground" />
+          </div>
+          <div className="mt-2 text-lg font-semibold">Make a sale</div>
+          <p className="mt-1 text-xs text-muted-foreground">Scan items and tender payment</p>
+        </div>
+      </Link>
+      <Link to="/pos/history">
+        <div className="rounded-lg border bg-card p-5 shadow-sm transition-colors hover:bg-accent/40">
+          <div className="flex items-center justify-between">
+            <h5 className="text-sm font-medium text-muted-foreground">Your Sales</h5>
+            <Receipt className="size-4 text-muted-foreground" />
+          </div>
+          <div className="mt-2 text-2xl font-semibold">
+            {sales.isLoading ? <Skeleton className="h-7 w-16" /> : sales.data?.total ?? 0}
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">Sales recorded on your account</p>
+        </div>
+      </Link>
+    </div>
   );
 }
 
@@ -190,11 +195,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={`Welcome back, ${user?.name?.split(" ")[0] ?? ""}`}
-        description={`${user?.tenant?.name ?? ""} · ${user?.branch?.name ?? ""}`}
-      />
-
+      <PageHeader title="Dashboard" description={`${user?.tenant?.name ?? ""} · ${user?.branch?.name ?? ""}`} />
       {canManage ? <ManagerDashboard /> : <CashierDashboard />}
     </div>
   );

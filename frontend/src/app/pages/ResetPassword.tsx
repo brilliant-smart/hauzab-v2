@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { resetPassword } from "@/app/api/auth";
+import { useDocumentTitle } from "@/app/lib/useDocumentTitle";
 import { handleApiError } from "@/app/lib/errorHandler";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +35,8 @@ export default function ResetPassword() {
   const [params] = useSearchParams();
   const token = params.get("token") ?? "";
   const email = params.get("email") ?? "";
+
+  useDocumentTitle("Hauzab - Reset Password");
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),

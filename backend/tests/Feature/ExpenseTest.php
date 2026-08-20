@@ -4,13 +4,11 @@ namespace Tests\Feature;
 
 use App\Enums\Role;
 use App\Models\ExpenseCategory;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TenancyHelpers;
 use Tests\TestCase;
 
 class ExpenseTest extends TestCase
 {
-    use RefreshDatabase;
     use TenancyHelpers;
 
     private function admin(): array

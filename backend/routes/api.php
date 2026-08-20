@@ -50,7 +50,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('products/expiring', [ProductController::class, 'expiring']);
     // Registered before the {product} wildcard so "import" isn't bound as an id.
     Route::get('products/import/template', [ProductController::class, 'importTemplate'])
-        ->middleware('role:admin|supervisor');
+        ->middleware('role:admin|supervisor|inventory_manager');
     Route::get('products/{product}', [ProductController::class, 'show']);
 
     Route::get('product-units', [ProductUnitController::class, 'index']);
@@ -58,15 +58,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('product-manufacturers', [ProductManufacturerController::class, 'index']);
     Route::get('product-suppliers', [ProductSupplierController::class, 'index']);
 
-    // Register and customers — any signed-in staff member can ring up sales.
-    Route::get('orders', [OrderController::class, 'index']);
-    Route::post('orders', [OrderController::class, 'store']);
-    Route::get('orders/{order}', [OrderController::class, 'show']);
-    Route::apiResource('customers', CustomerController::class);
+    // Register and customers — cashiers and managers ring up sales. Inventory
+    // Manager is a products-only role (rank 0), excluded from this allow-list so
+    // it cannot sell or browse sales/customers.
+    Route::get('orders', [OrderController::class, 'index'])->middleware('role:admin|supervisor|staff');
+    Route::post('orders', [OrderController::class, 'store'])->middleware('role:admin|supervisor|staff');
+    Route::get('orders/{order}', [OrderController::class, 'show'])->middleware('role:admin|supervisor|staff');
+    Route::apiResource('customers', CustomerController::class)->middleware('role:admin|supervisor|staff');
 
-    // Catalog and employee management — admins and supervisors only.
-    Route::middleware('role:admin|supervisor')->group(function () {
+    // Product catalog management — admins, supervisors, and the products-only
+    // Inventory Manager role. Kept as its own group (sibling to the manager group
+    // below) so the parent group's role:admin|supervisor doesn't 403 the
+    // products-only role before it reaches these routes.
+    Route::middleware('role:admin|supervisor|inventory_manager')->group(function () {
         Route::post('products', [ProductController::class, 'store']);
+        Route::post('products/image', [ProductController::class, 'uploadImage']);
         Route::post('products/import', [ProductController::class, 'import']);
         Route::put('products/{product}', [ProductController::class, 'update']);
         Route::patch('products/{product}', [ProductController::class, 'update']);
@@ -76,34 +82,56 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('product-categories', ProductCategoryController::class)->except(['index']);
         Route::apiResource('product-manufacturers', ProductManufacturerController::class)->except(['index']);
         Route::apiResource('product-suppliers', ProductSupplierController::class)->except(['index']);
+    });
 
-        Route::apiResource('users', UserController::class);
+    // Employee, branch, device, dashboard, report, consignment, audit, and
+    // expense management — admins and supervisors only. Inventory Manager
+    // (rank 0) is excluded from this group, so none of these are reachable.
+    Route::middleware('role:admin|supervisor')->group(function () {
+        // Employee records are admin-only (owner decision: supervisors must
+        // not see/manage staff accounts).
+        Route::apiResource('users', UserController::class)->middleware('role:admin');
 
         // Branch list for the Devices form + device (till/tablet) administration.
+        // Devices are admin-only (owner decision: supervisors must not administer tills).
         Route::get('branches', [BranchController::class, 'index']);
-        Route::apiResource('devices', DeviceController::class);
+        Route::apiResource('devices', DeviceController::class)->middleware('role:admin');
 
         // Voiding a completed sale is a manager action.
         Route::post('orders/{order}/void', [OrderController::class, 'void']);
 
         // Reports, dashboard, consignments, audit log, and expenses.
         // Permission mirrors the old app's inverted supervisor/manager helpers:
-        // managers (admin|supervisor) view; old "supervisor-only" actions
-        // (export, staff sales, expense edit/delete) are admin-only.
+        // managers (admin|supervisor) view; the audit trail (sales-audit,
+        // activity log), exports, staff sales, and expense edit/delete are
+        // admin-only (owner decision: supervisors must not see the audit trail).
         Route::get('dashboard/summary', [DashboardController::class, 'summary']);
+        Route::get('dashboard/charts', [DashboardController::class, 'charts']);
 
         Route::get('reports/sales', [ReportController::class, 'sales']);
-        Route::get('reports/sales-audit', [ReportController::class, 'salesAudit']);
+        Route::get('reports/sales-audit', [ReportController::class, 'salesAudit'])->middleware('role:admin');
+
+        // Excel exports for the audit trail and stock receipts. Registered
+        // before the {consignment} wildcard below so "export" isn't bound as an
+        // id. Admin-only (the parent group allows admin|supervisor; the route's
+        // own role:admin narrows it to admins).
+        Route::get('audit-logs/export', [AuditLogController::class, 'export'])->middleware('role:admin');
+        Route::get('consignments/export', [ConsignmentController::class, 'export'])->middleware('role:admin');
 
         Route::apiResource('consignments', ConsignmentController::class);
-        Route::apiResource('audit-logs', AuditLogController::class)->only(['index']);
+        // Activity log index is admin-only (paired with the admin-only export below).
+        Route::apiResource('audit-logs', AuditLogController::class)->only(['index'])->middleware('role:admin');
 
         Route::apiResource('expense-categories', ExpenseCategoryController::class)->only(['index', 'show']);
         Route::apiResource('expenses', ExpenseController::class)->only(['index', 'show']);
 
         Route::middleware('role:admin')->group(function () {
+            Route::get('reports/sales/export', [ReportController::class, 'salesExport']);
+            Route::get('reports/sales-history/export', [ReportController::class, 'salesHistoryExport']);
             Route::get('reports/sales-audit/export', [ReportController::class, 'salesAuditExport']);
             Route::get('reports/staff-sales', [ReportController::class, 'staffSales']);
+            Route::get('reports/staff-sales/export', [ReportController::class, 'staffSalesExport']);
+
             Route::apiResource('expense-categories', ExpenseCategoryController::class)->except(['index', 'show']);
             Route::apiResource('expenses', ExpenseController::class)->except(['index', 'show']);
         });

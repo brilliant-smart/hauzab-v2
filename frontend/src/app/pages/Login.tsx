@@ -6,6 +6,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { useAuth } from "@/app/auth/AuthContext";
 import { homePathFor } from "@/app/auth/guards";
+import { useDocumentTitle } from "@/app/lib/useDocumentTitle";
 import { handleApiError } from "@/app/lib/errorHandler";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +30,8 @@ type FormValues = z.infer<typeof schema>;
 export default function Login() {
   const { isAuthenticated, login, loading, user } = useAuth();
   const navigate = useNavigate();
+
+  useDocumentTitle("Hauzab - Sign In");
 
   useEffect(() => {
     if (isAuthenticated) {

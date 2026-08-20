@@ -112,7 +112,7 @@ export default function ConsignmentForm() {
       { id: id ? Number(id) : undefined, payload },
       {
         onSuccess: () => {
-          toast.success(isEdit ? "Consignment updated" : "Consignment added");
+          toast.success(isEdit ? "Stock receipt updated" : "Stock receipt added");
           navigate("/consignments");
         },
         onError: (e) => handleApiError(e),
@@ -123,7 +123,7 @@ export default function ConsignmentForm() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title={isEdit ? "Edit Consignment" : "Add Consignment"}
+        title={isEdit ? "Edit Stock Receipt" : "Add Stock Receipt"}
         actions={
           <Button variant="outline" asChild>
             <Link to="/consignments">
@@ -219,7 +219,7 @@ export default function ConsignmentForm() {
               <FormItem><FormLabel>Expire Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
             <FormField control={form.control} name="date" render={({ field }) => (
-              <FormItem><FormLabel>Consignment Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem><FormLabel>Receipt Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
           </div>
 
@@ -228,8 +228,8 @@ export default function ConsignmentForm() {
             name="consignment"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Consignment Note</FormLabel>
-                <FormControl><Input {...field} placeholder="Supplier / reference" /></FormControl>
+                <FormLabel>Note</FormLabel>
+                <FormControl><Input {...field} placeholder="Reference" /></FormControl>
                 <FormMessage />
               </FormItem>
             )}
@@ -241,7 +241,7 @@ export default function ConsignmentForm() {
             </Button>
             <Button type="submit" disabled={saveMutation.isPending}>
               <Save className="size-4" />
-              {saveMutation.isPending ? "Saving…" : isEdit ? "Update Consignment" : "Save Consignment"}
+              {saveMutation.isPending ? "Saving…" : isEdit ? "Update Stock Receipt" : "Save Stock Receipt"}
             </Button>
           </div>
         </form>

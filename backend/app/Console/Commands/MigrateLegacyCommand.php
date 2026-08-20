@@ -32,7 +32,7 @@ class MigrateLegacyCommand extends Command
     protected $description = 'Import the legacy Hauzab databases into v2 (lossless)';
 
     private const TENANTS = [
-        ['conn' => 'legacy_supermarket', 'slug' => 'supermarket', 'name' => 'Hauzab Supermarket', 'tenantId' => 1, 'suffix' => 'supermarket'],
+        ['conn' => 'legacy_supermarket', 'slug' => 'supermarket', 'name' => 'Hauzab Super Market', 'tenantId' => 1, 'suffix' => 'supermarket'],
         ['conn' => 'legacy_pharmacy', 'slug' => 'pharmacy', 'name' => 'Hauzab Pharmacy', 'tenantId' => 2, 'suffix' => 'pharmacy'],
     ];
 
@@ -199,9 +199,12 @@ class MigrateLegacyCommand extends Command
                         $collisions++;
                     }
 
+                    // Legacy helper hierarchy (inverted naming): isSupervisor()
+                    // is satisfied only by type 1, isManager() by type 1 OR 2,
+                    // so type 1 is the most-privileged role and maps to v2 admin.
                     $role = match ((int) $r->type) {
-                        1 => 'supervisor',
-                        2 => 'admin',
+                        1 => 'admin',
+                        2 => 'supervisor',
                         default => 'staff',
                     };
 

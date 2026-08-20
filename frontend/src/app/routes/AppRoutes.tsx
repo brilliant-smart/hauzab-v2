@@ -42,6 +42,12 @@ const DeviceList = lazy(() => import("@/app/pages/devices/DeviceList"));
 const Settings = lazy(() => import("@/app/pages/Settings"));
 
 const MANAGER_ROLES = ["admin", "supervisor"] as const;
+// Catalog management — admins, supervisors, and the products-only Inventory
+// Manager role (which ranks outside the ladder and is added explicitly here).
+const PRODUCT_ROLES = ["admin", "supervisor", "inventory_manager"] as const;
+// Selling + sales history + customers + dashboard — everyone except the
+// products-only Inventory Manager, which is excluded from this list.
+const SELLER_ROLES = ["admin", "supervisor", "staff"] as const;
 
 export default function AppRoutes() {
   return (
@@ -58,17 +64,48 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route path="/dashboard" element={<Dashboard />} />
+        {/* Dashboard — cashiers and managers (Inventory Manager lands on /products). */}
+        <Route
+          path="/dashboard"
+          element={
+            <RoleProtectedRoute allowedRoles={[...SELLER_ROLES]}>
+              <Dashboard />
+            </RoleProtectedRoute>
+          }
+        />
 
-        {/* Register — available to every signed-in staff member. */}
-        <Route path="/pos" element={<MakeSale />} />
-        <Route path="/pos/history" element={<SalesHistory />} />
-        <Route path="/pos/history/:id" element={<SaleDetail />} />
+        {/* Register — cashiers and managers. The products-only Inventory
+            Manager is excluded from SELLER_ROLES and cannot sell. */}
+        <Route
+          path="/pos"
+          element={
+            <RoleProtectedRoute allowedRoles={[...SELLER_ROLES]}>
+              <MakeSale />
+            </RoleProtectedRoute>
+          }
+        />
+        <Route
+          path="/pos/history"
+          element={
+            <RoleProtectedRoute allowedRoles={[...SELLER_ROLES]}>
+              <SalesHistory />
+            </RoleProtectedRoute>
+          }
+        />
+        <Route
+          path="/pos/history/:id"
+          element={
+            <RoleProtectedRoute allowedRoles={[...SELLER_ROLES]}>
+              <SaleDetail />
+            </RoleProtectedRoute>
+          }
+        />
 
+        {/* Products group — admins, supervisors, and Inventory Manager. */}
         <Route
           path="/products"
           element={
-            <RoleProtectedRoute allowedRoles={[...MANAGER_ROLES]}>
+            <RoleProtectedRoute allowedRoles={[...PRODUCT_ROLES]}>
               <ProductList />
             </RoleProtectedRoute>
           }
@@ -76,7 +113,7 @@ export default function AppRoutes() {
         <Route
           path="/products/new"
           element={
-            <RoleProtectedRoute allowedRoles={[...MANAGER_ROLES]}>
+            <RoleProtectedRoute allowedRoles={[...PRODUCT_ROLES]}>
               <ProductForm />
             </RoleProtectedRoute>
           }
@@ -84,7 +121,7 @@ export default function AppRoutes() {
         <Route
           path="/products/:id/edit"
           element={
-            <RoleProtectedRoute allowedRoles={[...MANAGER_ROLES]}>
+            <RoleProtectedRoute allowedRoles={[...PRODUCT_ROLES]}>
               <ProductForm />
             </RoleProtectedRoute>
           }
@@ -92,7 +129,7 @@ export default function AppRoutes() {
         <Route
           path="/products/low-stock"
           element={
-            <RoleProtectedRoute allowedRoles={[...MANAGER_ROLES]}>
+            <RoleProtectedRoute allowedRoles={[...PRODUCT_ROLES]}>
               <LowStock />
             </RoleProtectedRoute>
           }
@@ -100,7 +137,7 @@ export default function AppRoutes() {
         <Route
           path="/products/expiring"
           element={
-            <RoleProtectedRoute allowedRoles={[...MANAGER_ROLES]}>
+            <RoleProtectedRoute allowedRoles={[...PRODUCT_ROLES]}>
               <Expiring />
             </RoleProtectedRoute>
           }
@@ -109,7 +146,7 @@ export default function AppRoutes() {
         <Route
           path="/suppliers"
           element={
-            <RoleProtectedRoute allowedRoles={[...MANAGER_ROLES]}>
+            <RoleProtectedRoute allowedRoles={[...PRODUCT_ROLES]}>
               <Suppliers />
             </RoleProtectedRoute>
           }
@@ -117,7 +154,7 @@ export default function AppRoutes() {
         <Route
           path="/manufacturers"
           element={
-            <RoleProtectedRoute allowedRoles={[...MANAGER_ROLES]}>
+            <RoleProtectedRoute allowedRoles={[...PRODUCT_ROLES]}>
               <Manufacturers />
             </RoleProtectedRoute>
           }
@@ -125,7 +162,7 @@ export default function AppRoutes() {
         <Route
           path="/categories"
           element={
-            <RoleProtectedRoute allowedRoles={[...MANAGER_ROLES]}>
+            <RoleProtectedRoute allowedRoles={[...PRODUCT_ROLES]}>
               <Categories />
             </RoleProtectedRoute>
           }
@@ -133,16 +170,17 @@ export default function AppRoutes() {
         <Route
           path="/units"
           element={
-            <RoleProtectedRoute allowedRoles={[...MANAGER_ROLES]}>
+            <RoleProtectedRoute allowedRoles={[...PRODUCT_ROLES]}>
               <Units />
             </RoleProtectedRoute>
           }
         />
 
+        {/* Employee records — admin only (owner decision). */}
         <Route
           path="/employees"
           element={
-            <RoleProtectedRoute allowedRoles={[...MANAGER_ROLES]}>
+            <RoleProtectedRoute allowedRoles={["admin"]}>
               <EmployeeList />
             </RoleProtectedRoute>
           }
@@ -150,7 +188,7 @@ export default function AppRoutes() {
         <Route
           path="/employees/new"
           element={
-            <RoleProtectedRoute allowedRoles={[...MANAGER_ROLES]}>
+            <RoleProtectedRoute allowedRoles={["admin"]}>
               <EmployeeForm />
             </RoleProtectedRoute>
           }
@@ -158,20 +196,27 @@ export default function AppRoutes() {
         <Route
           path="/employees/:id/edit"
           element={
-            <RoleProtectedRoute allowedRoles={[...MANAGER_ROLES]}>
+            <RoleProtectedRoute allowedRoles={["admin"]}>
               <EmployeeForm />
             </RoleProtectedRoute>
           }
         />
 
-        {/* Customers — any signed-in staff member (matches backend). */}
-        <Route path="/customers" element={<CustomerList />} />
+        {/* Customers — cashiers and managers (Inventory Manager excluded). */}
+        <Route
+          path="/customers"
+          element={
+            <RoleProtectedRoute allowedRoles={[...SELLER_ROLES]}>
+              <CustomerList />
+            </RoleProtectedRoute>
+          }
+        />
 
-        {/* Devices — admin|supervisor. */}
+        {/* Devices — admin only. */}
         <Route
           path="/devices"
           element={
-            <RoleProtectedRoute allowedRoles={[...MANAGER_ROLES]}>
+            <RoleProtectedRoute allowedRoles={["admin"]}>
               <DeviceList />
             </RoleProtectedRoute>
           }
@@ -207,7 +252,7 @@ export default function AppRoutes() {
         <Route
           path="/reports/sales-audit"
           element={
-            <RoleProtectedRoute allowedRoles={[...MANAGER_ROLES]}>
+            <RoleProtectedRoute allowedRoles={["admin"]}>
               <SalesAudit />
             </RoleProtectedRoute>
           }
@@ -221,7 +266,7 @@ export default function AppRoutes() {
           }
         />
 
-        {/* Consignments — admin|supervisor */}
+        {/* Stock Receipts — admin|supervisor */}
         <Route
           path="/consignments"
           element={
@@ -247,11 +292,11 @@ export default function AppRoutes() {
           }
         />
 
-        {/* Activity log — admin|supervisor */}
+        {/* Activity log — admin only */}
         <Route
           path="/audit-logs"
           element={
-            <RoleProtectedRoute allowedRoles={[...MANAGER_ROLES]}>
+            <RoleProtectedRoute allowedRoles={["admin"]}>
               <ActivityLog />
             </RoleProtectedRoute>
           }

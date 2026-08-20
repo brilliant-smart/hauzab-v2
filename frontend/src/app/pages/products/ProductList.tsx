@@ -4,38 +4,32 @@ import { toast } from "sonner";
 import { Download, Pencil, Plus, Upload } from "lucide-react";
 import {
   downloadProductTemplate,
-  useDeleteProduct,
   useImportProducts,
   useProducts,
 } from "@/app/api/catalog";
 import { Product } from "@/app/api/types";
 import { useAuth } from "@/app/auth/AuthContext";
-import { isAtLeast } from "@/app/auth/guards";
+import { canManageProducts } from "@/app/auth/guards";
 import { handleApiError } from "@/app/lib/errorHandler";
 import { formatCurrency, formatNumber } from "@/app/lib/format";
 import { PageHeader } from "@/components/PageHeader";
 import { DataTable, Column } from "@/components/DataTable";
-import { ConfirmDelete } from "@/components/ConfirmDelete";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 
 export default function ProductList() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const { data, isLoading, isFetching, isError, refetch } = useProducts({ search, page });
-  const deleteMutation = useDeleteProduct();
+  const [perPage, setPerPage] = useState(10);
+  const { data, isLoading, isFetching, isError, refetch } = useProducts({
+    search,
+    page,
+    per_page: perPage,
+  });
   const importMutation = useImportProducts();
   const { user } = useAuth();
-  const canManage = isAtLeast(user, "supervisor");
+  const canManage = canManageProducts(user);
   const fileInput = useRef<HTMLInputElement>(null);
-
-  const handleDelete = (product: Product) => {
-    deleteMutation.mutate(product.id, {
-      onSuccess: () => toast.success("Product deleted"),
-      onError: (e) => handleApiError(e),
-    });
-  };
 
   const handleFile = (file: File | undefined) => {
     if (!file) return;
@@ -62,73 +56,54 @@ export default function ProductList() {
 
   const columns: Column<Product>[] = [
     {
-      key: "name",
-      header: "Product",
-      cell: (p) => (
-        <div className="min-w-[160px]">
-          <div className="font-medium">{p.name}</div>
-          <div className="text-xs text-muted-foreground">
-            {[p.size, p.model].filter(Boolean).join(" · ") || p.barcode || "—"}
-          </div>
-        </div>
-      ),
+      key: "sn",
+      header: "S/N",
+      cell: (_p, index) => (data?.from ? data.from + index : index + 1),
     },
     {
-      key: "category",
-      header: "Category",
-      cell: (p) => p.category?.name ?? "—",
+      key: "name",
+      header: "Name",
+      cell: (p) => p.name,
+    },
+    {
+      key: "size",
+      header: "Size",
+      cell: (p) => p.size ?? "—",
     },
     {
       key: "quantity",
-      header: "Stock",
-      cell: (p) => (
-        <span className={Number(p.quantity) <= p.reorder_level ? "font-medium text-destructive" : ""}>
-          {formatNumber(p.quantity)}
-        </span>
-      ),
+      header: "Quantity",
+      cell: (p) => formatNumber(p.quantity),
     },
     {
       key: "cost_price",
-      header: "Cost",
+      header: "Cost Price",
       cell: (p) => formatCurrency(p.cost_price),
     },
     {
       key: "selling_price",
-      header: "Selling",
+      header: "Selling Price",
       cell: (p) => formatCurrency(p.selling_price),
     },
     {
-      key: "expire_date",
-      header: "Expires",
-      cell: (p) => (p.expire_date ? new Date(p.expire_date).toLocaleDateString("en-GB") : "—"),
+      key: "manufacture_date",
+      header: "Manufactured Date",
+      cell: (p) => p.manufacture_date ?? "—",
     },
     {
-      key: "status",
-      header: "Status",
-      cell: (p) =>
-        p.is_active ? (
-          <Badge variant="secondary">Active</Badge>
-        ) : (
-          <Badge variant="outline">Inactive</Badge>
-        ),
+      key: "expire_date",
+      header: "Expire Date",
+      cell: (p) => p.expire_date ?? "—",
     },
     {
       key: "actions",
-      header: "",
-      className: "text-right",
+      header: "Action",
       cell: (p) => (
-        <div className="flex items-center justify-end gap-1">
-          <Button asChild variant="ghost" size="icon" aria-label={`Edit ${p.name}`}>
-            <Link to={`/products/${p.id}/edit`}>
-              <Pencil className="size-4" />
-            </Link>
-          </Button>
-          <ConfirmDelete
-            itemName={p.name}
-            onConfirm={() => handleDelete(p)}
-            loading={deleteMutation.isPending}
-          />
-        </div>
+        <Button asChild variant="outline" size="sm" aria-label={`Edit ${p.name}`}>
+          <Link to={`/products/${p.id}/edit`}>
+            <Pencil className="size-4" /> Edit
+          </Link>
+        </Button>
       ),
     },
   ];
@@ -137,7 +112,6 @@ export default function ProductList() {
     <div className="space-y-4">
       <PageHeader
         title="Product List"
-        description="All stocked items for this branch"
         actions={
           <div className="flex items-center gap-2">
             {canManage && (
@@ -161,13 +135,13 @@ export default function ProductList() {
                   {importMutation.isPending ? "Importing…" : "Import"}
                 </Button>
                 <Button variant="ghost" onClick={handleTemplate}>
-                  <Download className="size-4" /> Template
+                  <Download className="size-4" /> Download Template
                 </Button>
               </>
             )}
             <Button asChild>
               <Link to="/products/new">
-                <Plus className="size-4" /> Add Product
+                <Plus className="size-4" /> Add New
               </Link>
             </Button>
           </div>
@@ -197,6 +171,11 @@ export default function ProductList() {
         from={data?.from}
         to={data?.to}
         onPageChange={setPage}
+        perPage={perPage}
+        onPerPageChange={(n) => {
+          setPerPage(n);
+          setPage(1);
+        }}
       />
     </div>
   );

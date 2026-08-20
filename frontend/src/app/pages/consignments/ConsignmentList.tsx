@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { Pencil, Plus } from "lucide-react";
-import { useConsignments, useDeleteConsignment } from "@/app/api/consignments";
+import { Download, Pencil, Plus } from "lucide-react";
+import { useConsignments, useDeleteConsignment, downloadStockReceiptsExport } from "@/app/api/consignments";
 import { Consignment } from "@/app/api/types";
 import { useAuth } from "@/app/auth/AuthContext";
 import { isAdmin } from "@/app/auth/guards";
@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 export default function ConsignmentList() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [exporting, setExporting] = useState(false);
   const { data, isLoading, isFetching, isError, refetch } = useConsignments({ search, page });
   const deleteMutation = useDeleteConsignment();
   const { user } = useAuth();
@@ -24,9 +25,21 @@ export default function ConsignmentList() {
 
   const handleDelete = (row: Consignment) => {
     deleteMutation.mutate(row.id, {
-      onSuccess: () => toast.success("Consignment deleted"),
+      onSuccess: () => toast.success("Stock receipt deleted"),
       onError: (e) => handleApiError(e),
     });
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      await downloadStockReceiptsExport(search ? { search } : {});
+      toast.success("Export ready");
+    } catch (err) {
+      handleApiError(err, "Export failed");
+    } finally {
+      setExporting(false);
+    }
   };
 
   const perPage = data?.per_page ?? 0;
@@ -77,15 +90,20 @@ export default function ConsignmentList() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Product Consignment"
-        description="Consigned stock held on behalf of suppliers"
+        title="Stock Receipts"
+        description="Record of every batch received into stock"
         actions={
           canMutate ? (
-            <Button asChild>
-              <Link to="/consignments/new">
-                <Plus className="size-4" /> Add Consignment
-              </Link>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={handleExport} disabled={exporting}>
+                <Download className="size-4" /> {exporting ? "Exporting…" : "Export Excel"}
+              </Button>
+              <Button asChild>
+                <Link to="/consignments/new">
+                  <Plus className="size-4" /> Add Stock Receipt
+                </Link>
+              </Button>
+            </div>
           ) : undefined
         }
       />

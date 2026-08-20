@@ -17,8 +17,15 @@ echo "==> Frontend"
 cd "$APP_DIR/frontend"
 npm ci
 npm run build
-# --delete mirrors dist/ exactly, so stale assets from a previous build are removed.
-rsync -a --delete dist/ "$APP_DIR/backend/public/"
+# --delete mirrors dist/ into backend/public/ so stale hashed assets from a
+# previous build are removed, but Laravel's own front-controller files (which
+# live in the same public dir) are preserved.
+rsync -a --delete \
+  --exclude='index.php' \
+  --exclude='.htaccess' \
+  --exclude='robots.txt' \
+  --exclude='storage' \
+  dist/ "$APP_DIR/backend/public/"
 
 echo "==> Backend"
 cd "$APP_DIR/backend"

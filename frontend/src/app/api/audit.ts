@@ -1,5 +1,6 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "@/app/lib/api";
+import { downloadExport } from "@/app/lib/exportDownload";
 import { AuditLogEntry, Paginated } from "./types";
 
 export const auditKeys = {
@@ -15,4 +16,9 @@ export function useAuditLogs(params: Record<string, unknown> = {}) {
     },
     placeholderData: keepPreviousData,
   });
+}
+
+/** Export the activity log to .xlsx, honouring the current search/action filters (admin only). */
+export function downloadAuditLogExport(params: Record<string, unknown>): Promise<void> {
+  return downloadExport("audit-logs/export", params, "activity-log.xlsx");
 }

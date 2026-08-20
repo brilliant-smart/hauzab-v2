@@ -28,9 +28,9 @@ class OrderPersistence
      */
     public function create(array $data, int $tenantId, ?int $branchId, ?int $userId, ?int $deviceId): Order
     {
-        // Two checkouts can grab the same INV-00000N between count() and create().
+        // Two checkouts can grab the same daily sequence between read and insert.
         // The unique(tenant_id, number) index rejects the loser; retry the whole
-        // transaction so the count is recomputed and stock locks re-acquired.
+        // transaction so the sequence is recomputed and stock locks re-acquired.
         for ($attempt = 0; $attempt < 5; $attempt++) {
             try {
                 return $this->persist($data, $tenantId, $branchId, $userId, $deviceId);
@@ -148,14 +148,23 @@ class OrderPersistence
     }
 
     /**
-     * Per-tenant sequential invoice number (INV-000001). Concurrent checkouts
-     * can compute the same count; the unique index catches that and the caller
-     * retries the whole transaction.
+     * Per-tenant daily invoice number in the legacy date-based format: a 7-char
+     * date prefix (YY + month abbreviation + day, e.g. 26AUG18) followed by a
+     * 3-digit sequence that resets each day. Concurrent checkouts can compute
+     * the same sequence; the unique index catches that and the caller retries
+     * the whole transaction.
      */
     private function nextNumber(int $tenantId): string
     {
-        $count = Order::where('tenant_id', $tenantId)->count();
+        $prefix = strtoupper(now()->format('yMd'));
 
-        return 'INV-' . str_pad((string) ($count + 1), 6, '0', STR_PAD_LEFT);
+        $last = Order::where('tenant_id', $tenantId)
+            ->where('number', 'like', $prefix.'%')
+            ->orderByDesc('id')
+            ->value('number');
+
+        $seq = $last ? ((int) substr($last, 7)) + 1 : 1;
+
+        return $prefix . str_pad((string) $seq, 3, '0', STR_PAD_LEFT);
     }
 }

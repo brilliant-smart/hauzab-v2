@@ -95,6 +95,24 @@ export function useDeleteProduct() {
   });
 }
 
+export interface ProductImageUpload {
+  path: string;
+  url: string;
+}
+
+export function useUploadProductImage() {
+  return useMutation({
+    mutationFn: async (file: File): Promise<ProductImageUpload> => {
+      const form = new FormData();
+      form.append("file", file);
+      const { data } = await api.post<ProductImageUpload>("products/image", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return data;
+    },
+  });
+}
+
 export interface ImportResult {
   imported: number;
   updated: number;

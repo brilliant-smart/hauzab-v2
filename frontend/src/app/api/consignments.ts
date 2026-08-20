@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/app/lib/api";
+import { downloadExport } from "@/app/lib/exportDownload";
 import { Consignment, Paginated } from "./types";
 
 export const consignmentKeys = {
@@ -51,4 +52,9 @@ export function useDeleteConsignment() {
     mutationFn: async (id: number) => api.delete(`consignments/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: consignmentKeys.all }),
   });
+}
+
+/** Export stock receipts to .xlsx, honouring the current search filter (admin only). */
+export function downloadStockReceiptsExport(params: Record<string, unknown>): Promise<void> {
+  return downloadExport("consignments/export", params, "stock-receipts.xlsx");
 }

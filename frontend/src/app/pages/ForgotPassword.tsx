@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { forgotPassword } from "@/app/api/auth";
+import { useDocumentTitle } from "@/app/lib/useDocumentTitle";
 import { handleApiError } from "@/app/lib/errorHandler";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +27,7 @@ type FormValues = z.infer<typeof schema>;
 
 export default function ForgotPassword() {
   const [sent, setSent] = useState(false);
+  useDocumentTitle("Hauzab - Forgot Password");
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { email: "" },

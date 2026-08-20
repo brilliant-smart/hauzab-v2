@@ -9,14 +9,12 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductCard;
 use App\Services\StockLedger;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Tests\TenancyHelpers;
 use Tests\TestCase;
 
 class StockLedgerTest extends TestCase
 {
-    use RefreshDatabase;
     use TenancyHelpers;
 
     private function ledger(): StockLedger

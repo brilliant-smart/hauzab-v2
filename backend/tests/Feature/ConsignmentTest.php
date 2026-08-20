@@ -4,13 +4,11 @@ namespace Tests\Feature;
 
 use App\Enums\Role;
 use App\Models\ProductConsignment;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TenancyHelpers;
 use Tests\TestCase;
 
 class ConsignmentTest extends TestCase
 {
-    use RefreshDatabase;
     use TenancyHelpers;
 
     private function admin(): array

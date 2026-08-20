@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Enums\Role;
 use App\Models\Device;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TenancyHelpers;
 use Tests\TestCase;
 
@@ -14,7 +13,6 @@ use Tests\TestCase;
  */
 class DeviceTest extends TestCase
 {
-    use RefreshDatabase;
     use TenancyHelpers;
 
     private function admin(): array

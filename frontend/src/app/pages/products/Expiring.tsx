@@ -1,63 +1,56 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Pencil } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { useExpiring } from "@/app/api/catalog";
 import { Product } from "@/app/api/types";
-import { formatNumber } from "@/app/lib/format";
+import { formatCurrency, formatDate, formatNumber } from "@/app/lib/format";
 import { PageHeader } from "@/components/PageHeader";
 import { DataTable, Column } from "@/components/DataTable";
 import { Button } from "@/components/ui/button";
-
-function daysUntil(date: string | null | undefined): number | null {
-  if (!date) return null;
-  const diff = new Date(date).getTime() - Date.now();
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
-}
 
 export default function Expiring() {
   const [page, setPage] = useState(1);
   const { data, isLoading, isFetching, isError, refetch } = useExpiring({ page });
 
   const columns: Column<Product>[] = [
+    { key: "sn", header: "S/N", className: "w-16", cell: (_p, i) => i + 1 },
+    { key: "name", header: "Name", cell: (p) => p.name },
+    { key: "size", header: "Size", cell: (p) => p.size ?? "—" },
     {
-      key: "name",
-      header: "Product",
-      cell: (p) => (
-        <div>
-          <div className="font-medium">{p.name}</div>
-          <div className="text-xs text-muted-foreground">{p.category?.name ?? "—"}</div>
-        </div>
-      ),
+      key: "quantity",
+      header: "Quantity",
+      cell: (p) => formatNumber(p.quantity),
     },
-    { key: "unit", header: "Unit", cell: (p) => p.unit?.name ?? "—" },
-    { key: "quantity", header: "Stock", cell: (p) => formatNumber(p.quantity) },
+    {
+      key: "cost_price",
+      header: "Cost Price",
+      className: "text-right",
+      cell: (p) => formatCurrency(p.cost_price),
+    },
+    {
+      key: "selling_price",
+      header: "Selling Price",
+      className: "text-right",
+      cell: (p) => formatCurrency(p.selling_price),
+    },
+    {
+      key: "manufacture_date",
+      header: "Manufactured Date",
+      cell: (p) => formatDate(p.manufacture_date),
+    },
     {
       key: "expire_date",
-      header: "Expires",
-      cell: (p) => {
-        const days = daysUntil(p.expire_date);
-        const overdue = days != null && days < 0;
-        const soon = days != null && days <= 30;
-        return (
-          <span className={overdue ? "text-destructive" : soon ? "text-warning" : ""}>
-            {new Date(p.expire_date!).toLocaleDateString("en-GB")}
-            {days != null && (
-              <span className="ml-1 text-xs text-muted-foreground">
-                ({overdue ? `${Math.abs(days)}d over` : `${days}d left`})
-              </span>
-            )}
-          </span>
-        );
-      },
+      header: "Expire Date",
+      cell: (p) => formatDate(p.expire_date),
     },
     {
       key: "actions",
-      header: "",
+      header: "Action",
       className: "text-right",
       cell: (p) => (
-        <Button asChild variant="ghost" size="icon">
+        <Button asChild variant="outline" size="sm">
           <Link to={`/products/${p.id}/edit`}>
-            <Pencil className="size-4" />
+            <Pencil className="size-4" /> Edit
           </Link>
         </Button>
       ),
@@ -69,6 +62,13 @@ export default function Expiring() {
       <PageHeader
         title="Expired Product"
         description="Items expiring within 90 days"
+        actions={
+          <Button asChild>
+            <Link to="/products/new">
+              <Plus className="size-4" /> Add New
+            </Link>
+          </Button>
+        }
       />
       <DataTable
         columns={columns}

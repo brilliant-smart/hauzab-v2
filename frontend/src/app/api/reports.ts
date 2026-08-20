@@ -1,5 +1,6 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "@/app/lib/api";
+import { downloadExport } from "@/app/lib/exportDownload";
 import { Order, Paginated, SalesAuditRow, StaffSalesRow } from "./types";
 
 export const reportKeys = {
@@ -10,6 +11,10 @@ export const reportKeys = {
 
 export interface SalesReportPage extends Paginated<Order> {
   sums: { count: number; total: string; amount_paid: string };
+}
+
+export interface SalesAuditPage extends Paginated<SalesAuditRow> {
+  sums: { count: number; sold: string; amount: string };
 }
 
 export function useSalesReport(params: Record<string, unknown> = {}) {
@@ -27,7 +32,7 @@ export function useSalesAudit(params: Record<string, unknown> = {}) {
   return useQuery({
     queryKey: reportKeys.salesAudit(params),
     queryFn: async () => {
-      const { data } = await api.get<Paginated<SalesAuditRow>>("reports/sales-audit", { params });
+      const { data } = await api.get<SalesAuditPage>("reports/sales-audit", { params });
       return data;
     },
     placeholderData: keepPreviousData,
@@ -44,18 +49,18 @@ export function useStaffSales(params: Record<string, unknown> = {}) {
   });
 }
 
-/**
- * Download the Sales Audit spreadsheet. Streams the binary blob and hands it to
- * the browser as a click-triggered download (object URL revoked afterwards).
- */
-export async function downloadSalesAuditExport(params: Record<string, unknown>): Promise<void> {
-  const res = await api.get("reports/sales-audit/export", { params, responseType: "blob" });
-  const url = URL.createObjectURL(res.data);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `sales-audit.xlsx`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+export function downloadSalesReportExport(params: Record<string, unknown>): Promise<void> {
+  return downloadExport("reports/sales/export", params, "sales-report.xlsx");
+}
+
+export function downloadSalesHistoryExport(params: Record<string, unknown>): Promise<void> {
+  return downloadExport("reports/sales-history/export", params, "sales-history.xlsx");
+}
+
+export function downloadSalesAuditExport(params: Record<string, unknown>): Promise<void> {
+  return downloadExport("reports/sales-audit/export", params, "sales-audit.xlsx");
+}
+
+export function downloadStaffSalesExport(params: Record<string, unknown>): Promise<void> {
+  return downloadExport("reports/staff-sales/export", params, "staff-sales.xlsx");
 }

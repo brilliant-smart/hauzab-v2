@@ -4,13 +4,11 @@ namespace Tests\Feature;
 
 use App\Enums\Role;
 use App\Models\Product;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TenancyHelpers;
 use Tests\TestCase;
 
 class CatalogTest extends TestCase
 {
-    use RefreshDatabase;
     use TenancyHelpers;
 
     private function admin(): array
@@ -38,6 +36,31 @@ class CatalogTest extends TestCase
             ->getJson('/api/products')
             ->assertOk()
             ->assertJsonPath('data.0.barcode', '123456');
+    }
+
+    // reorder_level is NOT NULL (default 1). A blank form field arrives as
+    // null (or is omitted); both must fall back to the column default rather
+    // than violate the constraint, and the create response must show it.
+    public function test_a_blank_reorder_level_falls_back_to_the_column_default(): void
+    {
+        [$tenant, $branch, $admin] = $this->admin();
+
+        $this->actingAsUser($admin)
+            ->postJson('/api/products', [
+                'name' => 'Null Reorder', 'quantity' => 5,
+                'cost_price' => 10, 'selling_price' => 20,
+                'reorder_level' => null,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.reorder_level', 1);
+
+        $this->actingAsUser($admin)
+            ->postJson('/api/products', [
+                'name' => 'Omitted Reorder', 'quantity' => 5,
+                'cost_price' => 10, 'selling_price' => 20,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.reorder_level', 1);
     }
 
     public function test_duplicate_barcode_within_a_tenant_is_rejected(): void

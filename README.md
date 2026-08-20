@@ -1,12 +1,9 @@
 # Hauzab v2
 
-Multi-tenant, offline-first inventory + POS system. Rewrite of the existing Hauzab
-(Laravel 9 / Blade / jQuery) app using the stack from [BrilliantPOS](https://github.com/brilliant-smart/BrilliantPOS).
-
-> The old system lives in `../hauzab/` and is kept as the **reference for the exact
-> screens/flows** to replicate (staff must not be retrained). The BrilliantPOS repo is
-> cloned in `../_reference/BrilliantPOS/` and is the **stack template**.
-> Full plan: `../hauzab-v2-plan.docx` (sections A–G).
+Rebuild of Hauzab, the campus inventory and point-of-sale system, on a modern stack:
+a Laravel 13 (PHP 8.4) API with Sanctum auth, a React 18 + TypeScript + Vite + Tailwind +
+shadcn/ui frontend, and MariaDB. Multi-tenant and offline-first by design; the stack
+follows [BrilliantPOS](https://github.com/brilliant-smart/BrilliantPOS).
 
 ## Stack
 - **Backend:** Laravel 13, PHP 8.4, API-only, Sanctum token auth + custom AuthController.
@@ -34,7 +31,7 @@ cloud-authoritative; audit on the cloud.
 4. Expenses, reports, audit, low-stock, expiry, daily_logs + data migration from `hauzab_db` & `pharmacy`
 5. Polish, facelift, testing, deploy, staff cutover
 
-## Layout (to be created in Phase 0)
+## Layout
 ```
 backend/    Laravel 13 API + SPA host
 frontend/   React + Vite + TS + Tailwind + shadcn

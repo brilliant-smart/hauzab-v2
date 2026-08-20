@@ -6,14 +6,12 @@ use App\Enums\OrderStatus;
 use App\Enums\Role;
 use App\Models\Order;
 use App\Models\Product;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TenancyHelpers;
 use Tests\TestCase;
 
 class OrderTest extends TestCase
 {
-    use RefreshDatabase;
     use TenancyHelpers;
 
     private function checkoutPayload(Product $product, string $uuid, int $qty = 2, int $unitPrice = 100, int $tender = 200): array
@@ -39,7 +37,7 @@ class OrderTest extends TestCase
         $response = $this->actingAsUser($cashier)
             ->postJson('/api/orders', $this->checkoutPayload($product, '11111111-1111-4111-8111-111111111111'));
 
-        $response->assertCreated()->assertJsonPath('data.number', 'INV-000001');
+        $response->assertCreated()->assertJsonPath('data.number', strtoupper(now()->format('yMd')).'001');
         $this->assertSame('8.0000', (string) $product->fresh()->quantity);
     }
 
@@ -116,6 +114,37 @@ class OrderTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.0.uuid', '55555555-5555-4555-8555-555555555555')
             ->assertJsonMissing(['uuid' => '66666666-6666-4666-8666-666666666666']);
+    }
+
+    public function test_the_index_filters_by_from_to_date_range(): void
+    {
+        [$tenant, $branch] = $this->makeTenant('Store');
+        $cashier = $this->makeUser($tenant, $branch, Role::Staff);
+        $product = Product::create([
+            'tenant_id' => $tenant->id, 'name' => 'Soda',
+            'quantity' => 10, 'cost_price' => 50, 'selling_price' => 100,
+        ]);
+
+        $this->actingAsUser($cashier)->postJson('/api/orders', $this->checkoutPayload($product, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'))->assertCreated();
+        $this->actingAsUser($cashier)->postJson('/api/orders', $this->checkoutPayload($product, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'))->assertCreated();
+
+        // Backdate the first sale so a "today" range should exclude it.
+        DB::table('orders')->where('uuid', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')
+            ->update(['created_at' => now()->subDays(10)]);
+
+        $today = now()->toDateString();
+        $tenDaysAgo = now()->subDays(10)->toDateString();
+
+        $this->actingAsUser($cashier)
+            ->getJson('/api/orders?from='.$today.'&to='.$today)
+            ->assertOk()
+            ->assertJsonPath('data.0.uuid', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb')
+            ->assertJsonMissing(['uuid' => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa']);
+
+        $this->actingAsUser($cashier)
+            ->getJson('/api/orders?from='.$tenDaysAgo.'&to='.$today)
+            ->assertOk()
+            ->assertJsonCount(2, 'data');
     }
 
     public function test_a_new_sale_queues_the_cloud_push_and_audit_event(): void

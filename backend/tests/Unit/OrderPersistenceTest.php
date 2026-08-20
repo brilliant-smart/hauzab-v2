@@ -4,14 +4,12 @@ namespace Tests\Unit;
 
 use App\Models\Product;
 use App\Services\OrderPersistence;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TenancyHelpers;
 use Tests\TestCase;
 
 class OrderPersistenceTest extends TestCase
 {
-    use RefreshDatabase;
     use TenancyHelpers;
 
     private function persistence(): OrderPersistence
@@ -50,10 +48,11 @@ class OrderPersistenceTest extends TestCase
         $second = $this->persistence()->create($this->data([$this->item($productA, 1, 2)], '22222222-2222-4222-8222-222222222222', 2), $tenantA->id, $branchA->id, null, null);
         $other = $this->persistence()->create($this->data([$this->item($productB, 1, 2)], '33333333-3333-4333-8333-333333333333', 2), $tenantB->id, $branchB->id, null, null);
 
-        $this->assertSame('INV-000001', $first->number);
-        $this->assertSame('INV-000002', $second->number);
+        $prefix = strtoupper(now()->format('yMd'));
+        $this->assertSame($prefix.'001', $first->number);
+        $this->assertSame($prefix.'002', $second->number);
         // Tenant B has its own independent sequence.
-        $this->assertSame('INV-000001', $other->number);
+        $this->assertSame($prefix.'001', $other->number);
     }
 
     public function test_insufficient_stock_aborts_with_422_and_leaves_stock_intact(): void

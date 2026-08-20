@@ -5,13 +5,11 @@ namespace Tests\Feature;
 use App\Enums\Role;
 use App\Models\ExpenseCategory;
 use App\Models\Product;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TenancyHelpers;
 use Tests\TestCase;
 
 class TenancyTest extends TestCase
 {
-    use RefreshDatabase;
     use TenancyHelpers;
 
     public function test_products_are_isolated_per_tenant_on_read(): void
