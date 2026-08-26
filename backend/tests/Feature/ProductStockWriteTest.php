@@ -3,29 +3,30 @@
 namespace Tests\Feature;
 
 use App\Enums\Role;
+use App\Models\AuditLog;
 use App\Models\Product;
-use App\Models\ProductConsignment;
+use App\Models\StockMovement;
 use Tests\TenancyHelpers;
 use Tests\TestCase;
 
 /**
- * Receiving stock into the catalogue must also write a ProductConsignment row,
- * mirroring the legacy createProduct/restock flow. store() writes the full
- * initial qty, a restock update() writes only the delta, and a metadata-only
- * edit writes nothing (fixes the legacy bug that inflated the ledger on every
- * save).
+ * Stock is owned by the movement ledger, not the product form. Creating a
+ * product books its opening stock as a "received" movement (with a product.created
+ * audit row); a quantity change through the edit form is refused outright; a
+ * metadata-only edit touches no stock.
  */
-class ConsignmentAutoWriteTest extends TestCase
+class ProductStockWriteTest extends TestCase
 {
     use TenancyHelpers;
 
     private function admin(): array
     {
         [$tenant, $branch] = $this->makeTenant('Store');
+
         return [$tenant, $branch, $this->makeUser($tenant, $branch, Role::Admin)];
     }
 
-    public function test_creating_a_product_writes_a_consignment_for_the_full_quantity(): void
+    public function test_creating_a_product_books_opening_stock_as_a_received_movement(): void
     {
         [$tenant, $branch, $admin] = $this->admin();
 
@@ -38,15 +39,24 @@ class ConsignmentAutoWriteTest extends TestCase
             ])
             ->assertCreated();
 
-        $this->assertSame(1, ProductConsignment::count());
-        $consignment = ProductConsignment::first();
-        $this->assertSame('Crate Juice', $consignment->name);
-        $this->assertSame('12.0000', (string) $consignment->quantity);
-        $this->assertSame('30.0000', (string) $consignment->unit_profit);
-        $this->assertDatabaseHas('audit_logs', ['action' => 'consignment.created']);
+        $product = Product::first();
+        $this->assertSame('12.0000', (string) $product->quantity);
+
+        $movement = StockMovement::first();
+        $this->assertNotNull($movement);
+        $this->assertSame('received', $movement->type);
+        $this->assertSame('12.0000', (string) $movement->delta);
+        $this->assertSame('0.0000', (string) $movement->quantity_before);
+        $this->assertSame('12.0000', (string) $movement->quantity_after);
+        $this->assertSame('opening', $movement->reason);
+
+        $this->assertDatabaseHas('audit_logs', [
+            'action' => 'product.created',
+            'subject_name' => 'Crate Juice',
+        ]);
     }
 
-    public function test_a_restock_update_writes_a_consignment_for_the_delta_only(): void
+    public function test_a_quantity_change_through_the_edit_form_is_refused(): void
     {
         [$tenant, $branch, $admin] = $this->admin();
 
@@ -62,22 +72,14 @@ class ConsignmentAutoWriteTest extends TestCase
                 'cost_price' => 50,
                 'selling_price' => 80,
             ])
-            ->assertOk();
+            ->assertStatus(422);
 
-        // One delta row carrying the +6 increase.
-        $this->assertSame(1, ProductConsignment::count());
-        $this->assertSame('6.0000', (string) ProductConsignment::first()->quantity);
-        $this->assertSame('16.0000', (string) $product->fresh()->quantity);
-
-        // The day's card records the restock as added.
-        $this->assertDatabaseHas('product_cards', [
-            'product_id' => $product->id,
-            'added' => '6.0000',
-            'sold' => '0.0000',
-        ]);
+        // Stock is untouched by the refused edit.
+        $this->assertSame('10.0000', (string) $product->fresh()->quantity);
+        $this->assertSame(0, StockMovement::count());
     }
 
-    public function test_a_metadata_only_update_writes_no_consignment(): void
+    public function test_a_metadata_only_update_touches_no_stock(): void
     {
         [$tenant, $branch, $admin] = $this->admin();
 
@@ -95,7 +97,10 @@ class ConsignmentAutoWriteTest extends TestCase
             ])
             ->assertOk();
 
-        $this->assertSame(0, ProductConsignment::count());
         $this->assertSame('Crate Juice renamed', $product->fresh()->name);
+        $this->assertSame(0, StockMovement::count());
+
+        // The edit is audited with the changed fields.
+        $this->assertDatabaseHas('audit_logs', ['action' => 'product.updated']);
     }
-}
+};

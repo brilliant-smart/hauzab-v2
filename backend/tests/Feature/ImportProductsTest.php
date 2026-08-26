@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\Role;
 use App\Models\Product;
-use App\Models\ProductConsignment;
+use App\Models\StockMovement;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -14,8 +14,9 @@ use Tests\TestCase;
 
 /**
  * Bulk product import reads an .xlsx by header name, dedupes by barcode within
- * the tenant, opens a stock card per product, and writes a consignment row per
- * imported line. Invalid rows are skipped and reported in {errors}.
+ * the tenant, opens a stock card per product, and books each line's stock in
+ * as a "received" stock movement. Invalid rows are skipped and reported in
+ * {errors}.
  */
 class ImportProductsTest extends TestCase
 {
@@ -67,16 +68,20 @@ class ImportProductsTest extends TestCase
         $this->assertSame('15.0000', (string) $product->quantity);
         $this->assertSame('40.0000', (string) $product->cost_price);
 
-        // One consignment for the new line (qty 10) and one for the merge delta (+5).
-        $this->assertSame(2, ProductConsignment::count());
-        $this->assertSame('10.0000', (string) ProductConsignment::orderBy('id')->first()->quantity);
+        // Each line's stock-in is a "received" movement: one for the new line
+        // (qty 10) and one for the merge delta (+5).
+        $movements = StockMovement::where('product_id', $product->id)->orderBy('id')->get();
+        $this->assertSame(2, $movements->count());
+        $this->assertSame('received', $movements->first()->type);
+        $this->assertSame('10.0000', (string) $movements->first()->delta);
+        $this->assertSame('5.0000', (string) $movements->last()->delta);
 
-        // The merged restock is recorded as added on the day's card; the new
-        // product's card carries the initial stock as opening.
+        // The product is created at 0 and the opening stock booked in as added,
+        // so the card carries opening 0, added 15 (10 + 5), sold 0.
         $this->assertDatabaseHas('product_cards', [
             'product_id' => $product->id,
-            'opening' => '10.0000',
-            'added' => '5.0000',
+            'opening' => '0.0000',
+            'added' => '15.0000',
             'sold' => '0.0000',
         ]);
 

@@ -14,6 +14,7 @@ class ProductCard extends Model
     protected $fillable = [
         'tenant_id', 'product_id', 'date',
         'opening', 'added', 'reversed', 'sold',
+        'written_off', 'count_adj',
         'cost_price', 'selling_price', 'size',
         'user_id', 'legacy_id',
     ];
@@ -24,6 +25,8 @@ class ProductCard extends Model
         'added' => 'decimal:4',
         'reversed' => 'decimal:4',
         'sold' => 'decimal:4',
+        'written_off' => 'decimal:4',
+        'count_adj' => 'decimal:4',
         'cost_price' => 'decimal:4',
         'selling_price' => 'decimal:4',
     ];
@@ -38,9 +41,19 @@ class ProductCard extends Model
         return $this->belongsTo(User::class);
     }
 
-    /** Closing stock = opening + added - sold. */
+    /**
+     * Closing stock = opening + added - sold + reversed - written_off + count_adj.
+     * `reversed` restores voided stock; `written_off` removes it; `count_adj`
+     * nets a physical count onto the day. This reconciles to products.quantity.
+     */
     public function closing(): string
     {
-        return bcsub(bcadd((string) $this->opening, (string) $this->added, 4), (string) $this->sold, 4);
+        $closing = bcadd((string) $this->opening, (string) $this->added, 4);
+        $closing = bcsub($closing, (string) $this->sold, 4);
+        $closing = bcadd($closing, (string) $this->reversed, 4);
+        $closing = bcsub($closing, (string) $this->written_off, 4);
+        $closing = bcadd($closing, (string) $this->count_adj, 4);
+
+        return $closing;
     }
 }

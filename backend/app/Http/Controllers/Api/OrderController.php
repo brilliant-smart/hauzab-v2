@@ -10,11 +10,11 @@ use App\Http\Resources\OrderResource;
 use App\Models\AuditLog;
 use App\Models\Device;
 use App\Models\Order;
-use App\Models\Product;
 use App\Models\SyncOutbox;
 use App\Services\OrderPersistence;
-use App\Services\StockLedger;
+use App\Services\StockMovementService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
@@ -22,7 +22,7 @@ class OrderController extends Controller
 {
     public function __construct(
         private readonly OrderPersistence $persistence,
-        private readonly StockLedger $ledger,
+        private readonly StockMovementService $movements,
     ) {
     }
 
@@ -104,15 +104,27 @@ class OrderController extends Controller
         }
 
         DB::transaction(function () use ($order) {
-            // Restore stock for every line still tied to a live product.
+            // Restore stock for every line through the single authority so each
+            // reversal is an immutable stock_movements row + card bump on the
+            // original sale day.
+            $date = Carbon::parse($order->created_at);
             foreach ($order->items as $item) {
-                if ($item->product_id) {
-                    Product::where('id', $item->product_id)
-                        ->increment('quantity', $item->quantity);
+                if (! $item->product_id) {
+                    continue;
                 }
+                $this->movements->record(
+                    $order->tenant_id,
+                    $item->product_id,
+                    'void',
+                    (string) $item->quantity,
+                    $order->user_id,
+                    [
+                        'reference_type' => 'order',
+                        'reference_id' => $order->id,
+                        'date' => $date,
+                    ],
+                );
             }
-
-            $this->ledger->recordVoid($order);
 
             $order->update(['status' => OrderStatus::Voided->value]);
         });

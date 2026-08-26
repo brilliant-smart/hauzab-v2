@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\ProductManufacturerController;
 use App\Http\Controllers\Api\ProductSupplierController;
 use App\Http\Controllers\Api\ProductUnitController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\StockMovementController;
 use App\Http\Controllers\Api\SyncController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Http\Request;
@@ -82,6 +83,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('product-categories', ProductCategoryController::class)->except(['index']);
         Route::apiResource('product-manufacturers', ProductManufacturerController::class)->except(['index']);
         Route::apiResource('product-suppliers', ProductSupplierController::class)->except(['index']);
+
+        // Stock actions — received, write-off, and count all route through the
+        // immutable StockMovementService (lock, hard-block negatives, append the
+        // stock_movements row, bump the daily card, persist quantity) and write a
+        // human audit row. The ledger list shares this group; its Excel export is
+        // admin-only (paired with the other audit-trail exports).
+        Route::post('products/{product}/stock-received', [StockMovementController::class, 'received']);
+        Route::post('products/{product}/write-off', [StockMovementController::class, 'writeOff']);
+        Route::post('products/{product}/stock-count', [StockMovementController::class, 'count']);
+        Route::get('stock-movements/export', [StockMovementController::class, 'export'])->middleware('role:admin');
+        Route::get('stock-movements', [StockMovementController::class, 'index']);
     });
 
     // Employee, branch, device, dashboard, report, consignment, audit, and

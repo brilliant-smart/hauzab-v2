@@ -50,6 +50,10 @@ const ACTION_META: Record<string, ActionMeta> = {
   "consignment.created": { label: "Stock received", tone: "success" },
   "consignment.updated": { label: "Stock receipt updated", tone: "info" },
   "consignment.deleted": { label: "Stock receipt deleted", tone: "danger" },
+  "stock.received": { label: "Stock received", tone: "success" },
+  "stock.write_off": { label: "Stock written off", tone: "warning" },
+  "stock.count": { label: "Stock count", tone: "info" },
+  "stock.transfer": { label: "Stock transfer", tone: "info" },
 
   // Sales
   "order.created": { label: "Sale recorded", tone: "success" },
@@ -99,6 +103,10 @@ const FILTER_GROUPS: { label: string; actions: string[] }[] = [
       "consignment.created",
       "consignment.updated",
       "consignment.deleted",
+      "stock.received",
+      "stock.write_off",
+      "stock.count",
+      "stock.transfer",
     ],
   },
   {
@@ -184,7 +192,7 @@ export default function ActivityLog() {
       key: "action",
       header: "Action",
       cell: (r) => {
-        const meta = actionMeta(r.action);
+        const meta = ACTION_META[r.action] ?? { label: r.label ?? r.action, tone: "info" as Tone };
         return (
           <Badge
             variant={TONE_BADGE[meta.tone]}
@@ -201,8 +209,13 @@ export default function ActivityLog() {
       key: "subject",
       header: "Subject",
       cell: (r) =>
-        r.subject_type ? `${shortSubject(r.subject_type)} #${r.subject_id ?? "—"}` : "—",
+        r.subject_name
+          ? r.subject_name
+          : r.subject_type
+            ? `${shortSubject(r.subject_type)} #${r.subject_id ?? "—"}`
+            : "—",
     },
+    { key: "description", header: "Description", cell: (r) => r.description ?? "—" },
     { key: "ip", header: "IP", cell: (r) => r.ip ?? "—" },
   ];
 

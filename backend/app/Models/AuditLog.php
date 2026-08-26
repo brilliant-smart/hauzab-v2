@@ -16,7 +16,8 @@ class AuditLog extends Model
 
     protected $fillable = [
         'tenant_id', 'user_id', 'device_id', 'action',
-        'subject_type', 'subject_id', 'properties', 'ip', 'created_at',
+        'subject_type', 'subject_id', 'subject_name', 'description',
+        'properties', 'ip', 'created_at',
     ];
 
     protected $casts = [
@@ -42,6 +43,11 @@ class AuditLog extends Model
         'consignment.created' => 'Stock received',
         'consignment.updated' => 'Stock receipt updated',
         'consignment.deleted' => 'Stock receipt deleted',
+
+        'stock.received' => 'Stock received',
+        'stock.write_off' => 'Stock written off',
+        'stock.count' => 'Stock count',
+        'stock.transfer' => 'Stock transfer',
 
         'order.created' => 'Sale recorded',
         'order.voided' => 'Sale voided',
@@ -79,8 +85,14 @@ class AuditLog extends Model
      * Record an audit event. Resolves tenant/user from the auth context,
      * falling back to the subject's tenant. Never throws — a failed audit
      * entry must not break the request that triggered it.
+     *
+     * @param  string  $action       Dotted action code (see LABELS).
+     * @param  object|null  $subject The model the event acts on.
+     * @param  array  $properties    Structured before/after or context payload.
+     * @param  string|null  $subjectName  Human name (defaults to subject's name/number).
+     * @param  string|null  $description  One-line human summary of the event.
      */
-    public static function record(string $action, $subject = null, array $properties = []): ?self
+    public static function record(string $action, $subject = null, array $properties = [], ?string $subjectName = null, ?string $description = null): ?self
     {
         try {
             $user = Auth::user();
@@ -92,12 +104,68 @@ class AuditLog extends Model
                 'action' => $action,
                 'subject_type' => $subject ? get_class($subject) : null,
                 'subject_id' => $subject?->id ?? null,
+                'subject_name' => $subjectName ?? self::resolveSubjectName($subject),
+                'description' => $description,
                 'properties' => $properties ?: null,
                 'ip' => request()?->ip(),
             ]);
         } catch (\Throwable $e) {
             Log::warning('audit record failed', ['action' => $action, 'err' => $e->getMessage()]);
+
             return null;
         }
     }
-}
+
+    /**
+     * Best-effort human name for a subject: prefer an explicit name/number
+     * attribute, then fall back to "Type #id", then null for subject-less events.
+     */
+    private static function resolveSubjectName($subject): ?string
+    {
+        if ($subject === null) {
+            return null;
+        }
+
+        if (isset($subject->name)) {
+            return (string) $subject->name;
+        }
+        if (isset($subject->number)) {
+            return (string) $subject->number;
+        }
+
+        return class_basename($subject).' #'.$subject->id;
+    }
+
+    /**
+     * Insert-only. An audit row that already exists may never be re-saved —
+     * that would be a silent edit of the trail.
+     */
+    public function save(array $options = []): bool
+    {
+        if ($this->exists) {
+            throw new \RuntimeException('Audit logs are append-only.');
+        }
+
+        return parent::save($options);
+    }
+
+    public function update(array $attributes = [], array $options = []): bool
+    {
+        throw new \RuntimeException('Audit logs are append-only.');
+    }
+
+    public function delete(): bool
+    {
+        throw new \RuntimeException('Audit logs are append-only.');
+    }
+
+    public function forceDelete(): bool
+    {
+        throw new \RuntimeException('Audit logs are append-only.');
+    }
+
+    public function restore(): bool
+    {
+        throw new \RuntimeException('Audit logs are append-only.');
+    }
+};

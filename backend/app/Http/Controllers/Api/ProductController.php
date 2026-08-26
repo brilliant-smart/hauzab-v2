@@ -7,11 +7,11 @@ use App\Http\Resources\ProductResource;
 use App\Models\AuditLog;
 use App\Models\Product;
 use App\Models\ProductCategory;
-use App\Models\ProductConsignment;
 use App\Models\ProductManufacturer;
 use App\Models\ProductSupplier;
 use App\Models\ProductUnit;
 use App\Services\StockLedger;
+use App\Services\StockMovementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -28,6 +28,7 @@ class ProductController extends Controller
 {
     public function __construct(
         private readonly StockLedger $ledger,
+        private readonly StockMovementService $movements,
     ) {
     }
     public function index(Request $request)
@@ -62,18 +63,36 @@ class ProductController extends Controller
             unset($data['image']);
         }
 
-        $product = DB::transaction(function () use ($data, $user) {
+        // Stock is held in the base unit and only changes through the movement
+        // ledger, so the product is created at 0 and the opening stock is booked
+        // in as a "received" movement — one audited stock-in path, no separate
+        // consignment trail to drift out of sync.
+        $openingQty = (string) ($data['quantity'] ?? '0');
+        $data['quantity'] = 0;
+
+        $product = DB::transaction(function () use ($data, $user, $openingQty) {
             $product = Product::create($data);
 
-            // Open today's card with the initial stock as opening (no added).
+            // Open today's card (opening 0), then receive the opening stock.
             $this->ledger->seedDay($user->tenant_id, $product->id, $user->id, now());
 
-            // Receiving stock into the catalogue also writes a consignment
-            // row, mirroring the legacy createProduct flow.
-            $this->writeConsignment($product, (string) $product->quantity, $user);
+            if (bccomp($openingQty, '0') > 0) {
+                $this->movements->record($product->tenant_id, $product->id, 'received', $openingQty, $user->id, [
+                    'reason' => 'opening',
+                    'note' => 'Opening stock on product creation',
+                ]);
+            }
 
             return $product;
         });
+
+        DB::afterCommit(fn () => AuditLog::record(
+            'product.created',
+            $product,
+            ['quantity' => $openingQty],
+            $product->name,
+            "Product added: {$product->name}"
+        ));
 
         // Reload so DB-applied defaults (reorder_level, is_active) the create
         // payload omitted are reflected in the response, not left null.
@@ -93,26 +112,37 @@ class ProductController extends Controller
     {
         $data = $this->validated($request, $product);
         $user = $request->user();
-        $oldQty = (string) $product->quantity;
-        $newQty = (string) ($data['quantity'] ?? $oldQty);
 
-        DB::transaction(function () use ($product, $data, $user, $oldQty, $newQty) {
-            // A stock increase is a restock: record the delta as added before
-            // applying the new quantity so the card's opening is the old stock.
-            if (bccomp($newQty, $oldQty) > 0) {
-                $delta = bcsub($newQty, $oldQty, 4);
-                $this->ledger->recordRestock(
-                    $product->tenant_id,
-                    $product->id,
-                    $delta,
-                    $user->id,
-                );
-                // A restock also writes a consignment row carrying the added qty.
-                $this->writeConsignment($product, $delta, $user);
+        // Quantity is owned by the stock movement ledger, not the edit form. A
+        // differing quantity here is the legacy decrease/increase hole — refuse
+        // it outright so stock only ever moves through the audited actions.
+        if (array_key_exists('quantity', $data)) {
+            if (bccomp((string) $data['quantity'], (string) $product->quantity) !== 0) {
+                abort(422, 'Use Stock Received / Write-off / Stock Count to change quantity.');
             }
+            unset($data['quantity']);
+        }
 
-            $product->update($data);
-        });
+        // Capture a field-level before→after diff for the audit trail.
+        $changed = [];
+        foreach ($data as $key => $value) {
+            $old = $product->{$key};
+            if ((string) $old !== (string) $value) {
+                $changed[$key] = ['from' => $old, 'to' => $value];
+            }
+        }
+
+        if ($changed) {
+            DB::transaction(fn () => $product->update($data));
+
+            DB::afterCommit(fn () => AuditLog::record(
+                'product.updated',
+                $product,
+                ['fields' => $changed],
+                $product->name,
+                'Edited ' . implode(', ', array_keys($changed))
+            ));
+        }
 
         return new ProductResource($product->load(['category', 'unit', 'manufacturer', 'supplier']));
     }
@@ -270,7 +300,7 @@ class ProductController extends Controller
                     continue;
                 }
 
-                DB::transaction(function () use ($rowData, $user, $tenantId, &$imported, &$updated) {
+                DB::transaction(function () use ($rowData, $user, $tenantId, $batchId, &$imported, &$updated) {
                     $barcode = $rowData['barcode'] !== '' ? $rowData['barcode'] : null;
                     $existing = $barcode
                         ? Product::where('tenant_id', $tenantId)->where('barcode', $barcode)->first()
@@ -279,14 +309,16 @@ class ProductController extends Controller
                     if ($existing) {
                         $delta = (string) $rowData['quantity'];
 
-                        // Record the restock delta BEFORE bumping the quantity so
-                        // the card's opening is the pre-merge stock.
+                        // Stock-in goes through the movement ledger (one audited
+                        // path); metadata is updated separately, never quantity.
                         if (bccomp($delta, '0') > 0) {
-                            $this->ledger->recordRestock($tenantId, $existing->id, $delta, $user->id);
+                            $this->movements->record($tenantId, $existing->id, 'received', $delta, $user->id, [
+                                'reason' => 'purchase',
+                                'note' => "Import batch {$batchId}",
+                            ]);
                         }
 
-                        $existing->fill([
-                            'quantity' => bcadd((string) $existing->quantity, $delta, 4),
+                        $existing->update([
                             'cost_price' => $rowData['cost_price'] !== '0' ? $rowData['cost_price'] : $existing->cost_price,
                             'selling_price' => $rowData['selling_price'] !== '0' ? $rowData['selling_price'] : $existing->selling_price,
                             'size' => $rowData['size'] ?? $existing->size,
@@ -298,18 +330,25 @@ class ProductController extends Controller
                             'unit_id' => $rowData['unit_id'] ?? $existing->unit_id,
                             'manufacturer_id' => $rowData['manufacturer_id'] ?? $existing->manufacturer_id,
                             'supplier_id' => $rowData['supplier_id'] ?? $existing->supplier_id,
-                        ])->save();
+                        ]);
 
-                        $this->writeConsignment($existing, $delta, $user);
                         $updated++;
                     } else {
                         $createData = array_merge($rowData, ['tenant_id' => $tenantId, 'is_active' => true]);
                         // reorder_level is NOT NULL with a DB default; an explicit
                         // null would violate it, so coerce to 0 when the row omits it.
                         $createData['reorder_level'] = $createData['reorder_level'] ?? 0;
+                        // Stock is booked in via the movement ledger, not the row.
+                        $openingQty = (string) $createData['quantity'];
+                        $createData['quantity'] = 0;
                         $product = Product::create($createData);
                         $this->ledger->seedDay($tenantId, $product->id, $user->id, now());
-                        $this->writeConsignment($product, (string) $product->quantity, $user);
+                        if (bccomp($openingQty, '0') > 0) {
+                            $this->movements->record($tenantId, $product->id, 'received', $openingQty, $user->id, [
+                                'reason' => 'opening',
+                                'note' => "Import batch {$batchId}",
+                            ]);
+                        }
                         $imported++;
                     }
                 });
@@ -367,37 +406,6 @@ class ProductController extends Controller
         return response()->download($temp, $name, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ])->deleteFileAfterSend();
-    }
-
-    /**
-     * Write a ProductConsignment row for a product's received/restocked stock.
-     * Shared by store(), update(), and import() so the consignment ledger
-     * grows the same way for every entry path.
-     */
-    private function writeConsignment(Product $product, string $qty, $user): ProductConsignment
-    {
-        $consignment = ProductConsignment::create([
-            'tenant_id' => $product->tenant_id,
-            'user_id' => $user->id,
-            'name' => $product->name,
-            'size' => $product->size,
-            'department' => $product->department,
-            'model' => $product->model,
-            'category_id' => $product->category_id,
-            'quantity' => $qty,
-            'unit_cost' => $product->cost_price,
-            'unit_price' => $product->selling_price,
-            'unit_profit' => bcsub((string) $product->selling_price, (string) $product->cost_price, 4),
-            'manufacture_date' => $product->manufacture_date,
-            'expire_date' => $product->expire_date,
-            'date' => now()->toDateString(),
-            'barcode' => $product->barcode,
-            'image' => $product->image,
-        ]);
-
-        DB::afterCommit(fn () => AuditLog::record('consignment.created', $consignment));
-
-        return $consignment;
     }
 
     private function normalizeHeader(string $header): string
@@ -459,25 +467,61 @@ class ProductController extends Controller
     private function validated(Request $request, ?Product $product = null): array
     {
         $tenantId = $request->user()->tenant_id;
+        $creating = $product === null;
 
         $data = $request->validate([
-            'name' => ['required', 'string', 'max:191'],
+            // Create-time name uniqueness blocks new duplicates at the root cause.
+            // Edit-time uniqueness is deferred until the legacy duplicates are
+            // resolved manually (rename the survivor, retire the redundant row).
+            'name' => $creating
+                ? ['required', 'string', 'max:191', Rule::unique('products')->where('tenant_id', $tenantId)]
+                : ['required', 'string', 'max:191'],
             'description' => ['nullable', 'string'],
             'size' => ['nullable', 'string', 'max:120'],
             'model' => ['nullable', 'string', 'max:120'],
             'department' => ['nullable', 'string', 'max:120'],
-            'category_id' => ['nullable', 'integer', 'exists:product_categories,id'],
-            'unit_id' => ['nullable', 'integer', 'exists:product_units,id'],
-            'manufacturer_id' => ['nullable', 'integer', 'exists:product_manufacturers,id'],
-            'supplier_id' => ['nullable', 'integer', 'exists:product_suppliers,id'],
-            'quantity' => ['required', 'numeric', 'min:0'],
-            'cost_price' => ['required', 'numeric', 'min:0'],
-            'selling_price' => ['required', 'numeric', 'min:0'],
+            // Tenant-scoped lookups — a global exists: would let a product point
+            // at another tenant's category/unit/manufacturer/supplier.
+            'category_id' => ['nullable', 'integer', Rule::exists('product_categories', 'id')->where('tenant_id', $tenantId)],
+            'unit_id' => ['nullable', 'integer', Rule::exists('product_units', 'id')->where('tenant_id', $tenantId)],
+            'manufacturer_id' => ['nullable', 'integer', Rule::exists('product_manufacturers', 'id')->where('tenant_id', $tenantId)],
+            'supplier_id' => ['nullable', 'integer', Rule::exists('product_suppliers', 'id')->where('tenant_id', $tenantId)],
+            // Quantity is required on create (opening stock) and ignored on
+            // update — update() refuses a differing quantity outright.
+            'quantity' => $creating ? ['required', 'numeric', 'min:0'] : ['nullable', 'numeric', 'min:0'],
+            'cost_price' => ['required', 'numeric', 'min:0', function (string $attr, $value, $fail) use ($request) {
+                if ($request->boolean('is_active', true) && bccomp((string) $value, '0') === 0) {
+                    $fail('The cost price must be greater than 0 for an active product.');
+                }
+            }],
+            'selling_price' => ['required', 'numeric', 'min:0', 'gte:cost_price', function (string $attr, $value, $fail) use ($request) {
+                if ($request->boolean('is_active', true) && bccomp((string) $value, '0') === 0) {
+                    $fail('The selling price must be greater than 0 for an active product.');
+                }
+            }],
             'reorder_level' => ['nullable', 'integer', 'min:0'],
             'barcode' => ['nullable', 'string', 'max:191', Rule::unique('products')->where('tenant_id', $tenantId)->ignore($product?->id)],
             'image' => ['nullable', 'string', 'max:255'],
             'manufacture_date' => ['nullable', 'date', 'before_or_equal:today'],
-            'expire_date' => ['nullable', 'date'],
+            'expire_date' => ['nullable', 'date', function (string $attr, $value, $fail) use ($request) {
+                if ($value === null) {
+                    return;
+                }
+                $ts = strtotime((string) $value);
+                if ($ts === false) {
+                    return;
+                }
+                $mfg = $request->input('manufacture_date');
+                if ($mfg !== null && strtotime((string) $mfg) !== false && $ts < strtotime((string) $mfg)) {
+                    $fail('The expire date must be after the manufacture date.');
+                }
+                if ($ts < strtotime('2000-01-01')) {
+                    $fail('The expire date cannot be before 2000.');
+                }
+                if ($ts > strtotime('+10 years')) {
+                    $fail('The expire date is too far in the future.');
+                }
+            }],
             'is_active' => ['boolean'],
         ]);
 

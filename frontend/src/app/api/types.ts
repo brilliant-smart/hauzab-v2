@@ -297,9 +297,34 @@ export interface AuditLogEntry {
   action: string;
   subject_type: string | null;
   subject_id: number | null;
+  subject_name?: string | null;
+  description?: string | null;
+  label?: string;
+  changes?: string;
   properties?: Record<string, unknown> | null;
   ip: string | null;
   created_at: string;
+  user?: { id: number; name: string } | null;
+}
+
+export interface StockMovement {
+  id: number;
+  tenant_id: number;
+  product_id: number | null;
+  user_id: number | null;
+  type: string;
+  delta: string;
+  quantity_before: string;
+  quantity_after: string;
+  unit_id?: number | null;
+  factor?: string | null;
+  reference_type?: string | null;
+  reference_id?: number | null;
+  reason?: string | null;
+  note?: string | null;
+  type_label?: string;
+  created_at: string;
+  product?: { id: number; name: string } | null;
   user?: { id: number; name: string } | null;
 }
 

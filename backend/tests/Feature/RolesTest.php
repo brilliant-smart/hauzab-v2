@@ -145,4 +145,49 @@ class RolesTest extends TestCase
         $this->actingAsUser($im)->getJson('/api/audit-logs')->assertForbidden();
         $this->actingAsUser($im)->getJson('/api/devices')->assertForbidden();
     }
+
+    public function test_inventory_manager_can_use_stock_actions_but_not_the_export(): void
+    {
+        [$tenant, $branch] = $this->makeTenant('Store');
+        $im = $this->makeUser($tenant, $branch, Role::InventoryManager);
+
+        $product = Product::create([
+            'tenant_id' => $tenant->id, 'name' => 'Widget',
+            'quantity' => 5, 'cost_price' => 50, 'selling_price' => 80,
+        ]);
+
+        // Stock Received, Write-off, Stock Count, and the movements ledger are
+        // open to the products-only role.
+        $this->actingAsUser($im)
+            ->postJson("/api/products/{$product->id}/stock-received", ['quantity' => 3])
+            ->assertCreated();
+        $this->actingAsUser($im)
+            ->postJson("/api/products/{$product->id}/write-off", ['quantity' => 1])
+            ->assertCreated();
+        $this->actingAsUser($im)
+            ->postJson("/api/products/{$product->id}/stock-count", ['counted' => 10])
+            ->assertCreated();
+        $this->actingAsUser($im)->getJson('/api/stock-movements')->assertOk();
+
+        // The movements Excel export is admin-only (audit-trail export).
+        $this->actingAsUser($im)->getJson('/api/stock-movements/export')->assertForbidden();
+    }
+
+    public function test_staff_cannot_reach_stock_actions(): void
+    {
+        [$tenant, $branch] = $this->makeTenant('Store');
+        $staff = $this->makeUser($tenant, $branch, Role::Staff);
+
+        $product = Product::create([
+            'tenant_id' => $tenant->id, 'name' => 'Widget',
+            'quantity' => 5, 'cost_price' => 50, 'selling_price' => 80,
+        ]);
+
+        $this->actingAsUser($staff)
+            ->postJson("/api/products/{$product->id}/stock-received", ['quantity' => 1])
+            ->assertForbidden();
+        $this->actingAsUser($staff)
+            ->getJson('/api/stock-movements')
+            ->assertForbidden();
+    }
 }

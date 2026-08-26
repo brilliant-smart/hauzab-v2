@@ -5,6 +5,7 @@ import {
   BarChart3,
   Boxes,
   ChevronDown,
+  ClipboardList,
   Contact,
   LayoutDashboard,
   Loader2,
@@ -78,6 +79,13 @@ const EXPENSE_CHILDREN: NavLeaf[] = [
   { to: "/expenses", label: "Expense List" },
 ];
 
+const STOCK_CHILDREN: NavLeaf[] = [
+  { to: "/stock/received", label: "Stock Received" },
+  { to: "/stock/write-off", label: "Write-offs" },
+  { to: "/stock/count", label: "Stock Count" },
+  { to: "/stock/movements", label: "Stock Movements", end: true },
+];
+
 const REPORTS_CHILDREN: NavLeaf[] = [
   { to: "/reports/sales", label: "Sales Report" },
   { to: "/pos/history", label: "Sales History" },
@@ -94,6 +102,7 @@ const PRIMARY_NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, end: true, managerOnly: true },
   { to: "/pos", label: "Make Sale", icon: ShoppingCart, end: true, roles: ["admin", "supervisor", "staff"] },
   { label: "Products", icon: Boxes, children: PRODUCTS_CHILDREN, roles: ["admin", "supervisor", "inventory_manager"] },
+  { label: "Stock", icon: ClipboardList, children: STOCK_CHILDREN, roles: ["admin", "supervisor", "inventory_manager"] },
   { label: "Reports", icon: BarChart3, children: REPORTS_CHILDREN, managerOnly: true },
   { label: "Expenses", icon: Wallet, children: EXPENSE_CHILDREN, managerOnly: true },
   { to: "/employees", label: "Employee Records", icon: Users, managerOnly: true, roles: ["admin"] },
@@ -322,6 +331,11 @@ const PAGE_TITLES: Record<string, string> = {
   "/reports/sales-audit": "Sales Audit",
   "/reports/staff-sales": "Staff Sales",
   "/consignments": "Stock Receipts",
+  "/stock": "Stock",
+  "/stock/received": "Stock Received",
+  "/stock/write-off": "Write-off Stock",
+  "/stock/count": "Stock Count",
+  "/stock/movements": "Stock Movements",
   "/audit-logs": "Activity Log",
   "/settings": "Settings",
 };

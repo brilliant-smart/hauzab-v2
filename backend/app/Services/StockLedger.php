@@ -10,13 +10,15 @@ use Illuminate\Support\Carbon;
 
 /**
  * Daily stock ledger. One product_cards row per product per tenant per day
- * captures opening/added/sold/reversed so the Sales Audit report can show a
- * per-product daily movement. Cards are per-instance reporting, not synced —
- * each instance derives its own from its own sales.
+ * captures opening/added/sold/reversed/written_off/count_adj so the Sales Audit
+ * report can show a per-product daily movement and so products.quantity can be
+ * reconciled (closing = opening + added - sold + reversed - written_off
+ * + count_adj). Cards are per-instance reporting, not synced — each instance
+ * derives its own from its own sales.
  *
- * Every method runs inside the caller's existing DB::transaction so a card
- * write shares the sale's atomicity and lock scope; no nested transaction,
- * no outbox, no audit.
+ * These methods are pure card counters — they do NOT mutate products.quantity
+ * and do NOT write stock_movements; StockMovementService owns both. Every
+ * method runs inside the caller's existing DB::transaction.
  */
 class StockLedger
 {
@@ -49,13 +51,14 @@ class StockLedger
     }
 
     /**
-     * Record one sale line's stock movement. Call before decrementing the
-     * product's quantity so opening reflects pre-sale stock. Used per-line
-     * inside OrderPersistence::persist() where the order row does not exist yet.
+     * Record one sale line's stock movement against a day. Call before the
+     * product quantity is decremented so opening reflects pre-sale stock.
+     * Accepts a signed delta (negative for a sale); the counter is a magnitude.
      */
     public function applySaleLine(int $tenantId, int $productId, string $qty, ?int $userId, Carbon $date): void
     {
-        if (bccomp($qty, '0') <= 0) {
+        $qty = $this->magnitude($qty);
+        if (bccomp($qty, '0') === 0) {
             return;
         }
 
@@ -64,7 +67,22 @@ class StockLedger
     }
 
     /**
-     * Record a void's reversals against the day the sale originally happened.
+     * Record a void's reversal for one line against the day the sale happened.
+     */
+    public function recordVoidLine(int $tenantId, int $productId, string $qty, ?int $userId, Carbon $date): void
+    {
+        $qty = $this->magnitude($qty);
+        if (bccomp($qty, '0') === 0) {
+            return;
+        }
+
+        $card = $this->seedDay($tenantId, $productId, $userId, $date);
+        $card->increment('reversed', $qty);
+    }
+
+    /**
+     * Record a void for a whole order — kept for backward compatibility; the
+     * void flow now goes through StockMovementService per line.
      */
     public function recordVoid(Order $order): void
     {
@@ -74,8 +92,7 @@ class StockLedger
             if (! $item->product_id) {
                 continue;
             }
-            $card = $this->seedDay($order->tenant_id, $item->product_id, $order->user_id, $date);
-            $card->increment('reversed', (string) $item->quantity);
+            $this->recordVoidLine($order->tenant_id, $item->product_id, (string) $item->quantity, $order->user_id, $date);
         }
     }
 
@@ -84,11 +101,54 @@ class StockLedger
      */
     public function recordRestock(int $tenantId, int $productId, string $delta, ?int $userId): void
     {
-        if (bccomp($delta, '0') <= 0) {
+        $delta = $this->magnitude($delta);
+        if (bccomp($delta, '0') === 0) {
             return;
         }
 
         $card = $this->seedDay($tenantId, $productId, $userId, now());
         $card->increment('added', $delta);
     }
-}
+
+    /**
+     * Record a write-off (stock removed) against today.
+     */
+    public function recordWriteOff(int $tenantId, int $productId, string $delta, ?int $userId): void
+    {
+        $delta = $this->magnitude($delta);
+        if (bccomp($delta, '0') === 0) {
+            return;
+        }
+
+        $card = $this->seedDay($tenantId, $productId, $userId, now());
+        $card->increment('written_off', $delta);
+    }
+
+    /**
+     * Record a physical count against today. The count_adj counter is set so the
+     * card closes at the counted figure: count_adj = counted - current_closing.
+     */
+    public function recordCount(int $tenantId, int $productId, string $counted, ?int $userId): void
+    {
+        $card = $this->seedDay($tenantId, $productId, $userId, now());
+
+        // closing = opening + added - sold + reversed - written_off + count_adj.
+        // The count adjusts count_adj so the card closes at `counted`.
+        $currentClosing = bcadd((string) $card->opening, (string) $card->added, 4);
+        $currentClosing = bcsub($currentClosing, (string) $card->sold, 4);
+        $currentClosing = bcadd($currentClosing, (string) $card->reversed, 4);
+        $currentClosing = bcsub($currentClosing, (string) $card->written_off, 4);
+        $currentClosing = bcadd($currentClosing, (string) $card->count_adj, 4);
+
+        $adj = bcsub($counted, $currentClosing, 4);
+
+        if (bccomp($adj, '0') !== 0) {
+            $card->increment('count_adj', $adj);
+        }
+    }
+
+    private function magnitude(string $value): string
+    {
+        return bccomp($value, '0') < 0 ? bcmul($value, '-1', 4) : $value;
+    }
+};

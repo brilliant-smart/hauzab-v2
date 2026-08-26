@@ -36,6 +36,10 @@ const SalesAudit = lazy(() => import("@/app/pages/reports/SalesAudit"));
 const StaffSales = lazy(() => import("@/app/pages/reports/StaffSales"));
 const ConsignmentList = lazy(() => import("@/app/pages/consignments/ConsignmentList"));
 const ConsignmentForm = lazy(() => import("@/app/pages/consignments/ConsignmentForm"));
+const StockReceivedForm = lazy(() => import("@/app/pages/stock/StockReceivedForm"));
+const WriteOffForm = lazy(() => import("@/app/pages/stock/WriteOffForm"));
+const StockCountForm = lazy(() => import("@/app/pages/stock/StockCountForm"));
+const StockMovements = lazy(() => import("@/app/pages/stock/StockMovements"));
 const ActivityLog = lazy(() => import("@/app/pages/audit/ActivityLog"));
 const CustomerList = lazy(() => import("@/app/pages/customers/CustomerList"));
 const DeviceList = lazy(() => import("@/app/pages/devices/DeviceList"));
@@ -288,6 +292,41 @@ export default function AppRoutes() {
           element={
             <RoleProtectedRoute allowedRoles={[...MANAGER_ROLES]}>
               <ConsignmentForm />
+            </RoleProtectedRoute>
+          }
+        />
+
+        {/* Stock actions — received, write-off, count, and the movements
+            ledger. Admins, supervisors, and the Inventory Manager. */}
+        <Route
+          path="/stock/received"
+          element={
+            <RoleProtectedRoute allowedRoles={[...PRODUCT_ROLES]}>
+              <StockReceivedForm />
+            </RoleProtectedRoute>
+          }
+        />
+        <Route
+          path="/stock/write-off"
+          element={
+            <RoleProtectedRoute allowedRoles={[...PRODUCT_ROLES]}>
+              <WriteOffForm />
+            </RoleProtectedRoute>
+          }
+        />
+        <Route
+          path="/stock/count"
+          element={
+            <RoleProtectedRoute allowedRoles={[...PRODUCT_ROLES]}>
+              <StockCountForm />
+            </RoleProtectedRoute>
+          }
+        />
+        <Route
+          path="/stock/movements"
+          element={
+            <RoleProtectedRoute allowedRoles={[...PRODUCT_ROLES]}>
+              <StockMovements />
             </RoleProtectedRoute>
           }
         />

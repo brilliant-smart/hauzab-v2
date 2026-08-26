@@ -84,6 +84,7 @@ class ReportController extends Controller
             ->select([
                 'product_cards.id', 'product_cards.date', 'product_cards.opening',
                 'product_cards.added', 'product_cards.reversed', 'product_cards.sold',
+                'product_cards.written_off', 'product_cards.count_adj',
                 'product_cards.cost_price', 'product_cards.selling_price',
                 'products.name as product_name', 'products.size as product_size',
                 'products.expire_date', 'users.name as user_name',
@@ -92,7 +93,11 @@ class ReportController extends Controller
             ->get()
             ->map(function ($r) {
                 $amount = bcmul((string) $r->sold, (string) ($r->selling_price ?? 0), 4);
-                $closing = bcsub(bcadd((string) $r->opening, (string) $r->added, 4), (string) $r->sold, 4);
+                $closing = bcadd((string) $r->opening, (string) $r->added, 4);
+                $closing = bcsub($closing, (string) $r->sold, 4);
+                $closing = bcadd($closing, (string) $r->reversed, 4);
+                $closing = bcsub($closing, (string) ($r->written_off ?? 0), 4);
+                $closing = bcadd($closing, (string) ($r->count_adj ?? 0), 4);
 
                 return [
                     'id' => $r->id,
@@ -103,6 +108,8 @@ class ReportController extends Controller
                     'added' => (string) $r->added,
                     'reversed' => (string) $r->reversed,
                     'sold' => (string) $r->sold,
+                    'written_off' => (string) ($r->written_off ?? 0),
+                    'count_adj' => (string) ($r->count_adj ?? 0),
                     'cost_price' => (string) ($r->cost_price ?? 0),
                     'selling_price' => (string) ($r->selling_price ?? 0),
                     'amount' => $amount,
@@ -258,13 +265,21 @@ class ReportController extends Controller
             ->orderBy('product_cards.id')
             ->select([
                 'product_cards.date', 'product_cards.opening', 'product_cards.added',
-                'product_cards.sold', 'product_cards.cost_price', 'product_cards.selling_price',
+                'product_cards.reversed', 'product_cards.sold',
+                'product_cards.written_off', 'product_cards.count_adj',
+                'product_cards.cost_price', 'product_cards.selling_price',
                 'products.name as product_name', 'products.size as product_size',
                 'products.expire_date', 'users.name as user_name',
             ])
             ->cursor();
 
         foreach ($audit as $r) {
+            $closing = bcadd((string) $r->opening, (string) $r->added, 4);
+            $closing = bcsub($closing, (string) $r->sold, 4);
+            $closing = bcadd($closing, (string) $r->reversed, 4);
+            $closing = bcsub($closing, (string) ($r->written_off ?? 0), 4);
+            $closing = bcadd($closing, (string) ($r->count_adj ?? 0), 4);
+
             $cells = [
                 $r->date?->toDateString(),
                 $r->product_name,
@@ -275,7 +290,7 @@ class ReportController extends Controller
                 (float) $r->selling_price,
                 (float) $r->sold,
                 (float) bcmul((string) $r->sold, (string) ($r->selling_price ?? 0), 4),
-                (float) bcsub(bcadd((string) $r->opening, (string) $r->added, 4), (string) $r->sold, 4),
+                (float) $closing,
                 optional($r->expire_date)->toDateString(),
                 $r->user_name,
             ];

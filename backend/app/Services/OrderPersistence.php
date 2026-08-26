@@ -6,7 +6,6 @@ use App\Enums\OrderStatus;
 use App\Models\Order;
 use App\Models\Product;
 use Illuminate\Database\QueryException;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -17,7 +16,7 @@ use Illuminate\Support\Facades\DB;
 class OrderPersistence
 {
     public function __construct(
-        private readonly StockLedger $ledger,
+        private readonly StockMovementService $movements,
     ) {
     }
 
@@ -67,6 +66,12 @@ class OrderPersistence
                 if (bccomp($qty, '0') <= 0) {
                     abort(422, 'Quantity must be greater than zero.');
                 }
+
+                // Hard block selling expired stock at the register and on sync.
+                if ($product->expire_date && $product->expire_date->isBefore(today())) {
+                    abort(422, "Product {$product->name} has expired and cannot be sold.");
+                }
+
                 if (bccomp($qty, (string) $product->quantity) > 0) {
                     abort(422, "Insufficient stock for {$product->name}.");
                 }
@@ -87,11 +92,14 @@ class OrderPersistence
                     'line_total' => $lineTotal,
                 ];
 
-                // Write the ledger line before the stock decrement so the
-                // card's opening captures pre-sale stock.
-                $this->ledger->applySaleLine($tenantId, $product->id, $qty, $userId, Carbon::now());
-
-                $product->decrement('quantity', $qty);
+                // Route the stock change through the single authority: it locks
+                // the product, hard-blocks negatives, appends the stock_movements
+                // row, bumps the daily card, and persists the new quantity. The
+                // card opening captures pre-sale stock since the service mutates
+                // only after bumping the card.
+                $this->movements->record($tenantId, $product->id, 'sale', bcmul($qty, '-1', 4), $userId, [
+                    'reference_type' => 'order',
+                ]);
             }
 
             $discount = (string) ($data['discount'] ?? 0);

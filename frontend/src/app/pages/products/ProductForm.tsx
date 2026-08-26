@@ -38,11 +38,11 @@ import {
 const schema = z.object({
   barcode: z.string().optional(),
   name: z.string().min(1, "Product name is required"),
-  size: z.string().min(1, "Product size is required"),
+  unit_id: z.string().min(1, "Unit is required"),
   quantity: z.coerce.number().min(0, "Required"),
   cost_price: z.coerce.number().min(0, "Required"),
   selling_price: z.coerce.number().min(0, "Required"),
-  department: z.string().min(1, "Department is required"),
+  category_id: z.string().min(1, "Category is required"),
   manufacture_date: z.string().optional(),
   expire_date: z.string().optional(),
   reorder_level: z.coerce.number().min(0).optional(),
@@ -81,6 +81,8 @@ export default function ProductForm() {
   const { data: product } = useProduct(id ? Number(id) : undefined);
   const manufacturers = useLookupList("product-manufacturers");
   const suppliers = useLookupList("product-suppliers");
+  const units = useLookupList("product-units");
+  const categories = useLookupList("product-categories");
   const saveMutation = useSaveProduct();
   const uploadImage = useUploadProductImage();
 
@@ -90,6 +92,8 @@ export default function ProductForm() {
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
+      unit_id: "",
+      category_id: "",
       quantity: 0,
       cost_price: 0,
       selling_price: 0,
@@ -101,11 +105,11 @@ export default function ProductForm() {
       form.reset({
         barcode: product.barcode ?? "",
         name: product.name,
-        size: product.size ?? "",
+        unit_id: product.unit_id ? String(product.unit_id) : "",
         quantity: Number(product.quantity),
         cost_price: Number(product.cost_price),
         selling_price: Number(product.selling_price),
-        department: product.department ?? "",
+        category_id: product.category_id ? String(product.category_id) : "",
         manufacture_date: product.manufacture_date ?? "",
         expire_date: product.expire_date ?? "",
         reorder_level: product.reorder_level,
@@ -131,9 +135,11 @@ export default function ProductForm() {
   };
 
   const onSubmit = (values: FormValues) => {
-    const { reorder_level, ...rest } = values;
+    const { reorder_level, quantity, ...rest } = values;
     const payload: Record<string, unknown> = {
       ...rest,
+      unit_id: values.unit_id || null,
+      category_id: values.category_id || null,
       manufacturer_id: values.manufacturer_id || null,
       supplier_id: values.supplier_id || null,
       manufacture_date: values.manufacture_date || null,
@@ -142,6 +148,12 @@ export default function ProductForm() {
       model: values.model || null,
       image: values.image || null,
     };
+    // Opening stock is set on create only. On edit the quantity field is
+    // hidden and never sent — stock changes go through Stock Received /
+    // Write-off / Stock Count, never the product form.
+    if (!isEdit) {
+      payload.quantity = quantity;
+    }
     // Send reorder_level only when the field was filled; a blank Order level
     // lets the backend apply its NOT NULL column default on create (and keeps
     // the existing value on edit).
@@ -205,34 +217,45 @@ export default function ProductForm() {
           <div className="grid gap-4 md:grid-cols-3">
             <FormField
               control={form.control}
-              name="size"
+              name="unit_id"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    Product Size <span className="text-destructive">*</span>
+                    Unit <span className="text-destructive">*</span>
                   </FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="Enter Product Size" />
-                  </FormControl>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select unit" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {toSelectOptions(units.data).map((o) => (
+                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="quantity"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>
-                    Product Quantity <span className="text-destructive">*</span>
-                  </FormLabel>
-                  <FormControl>
-                    <Input type="number" step="any" min={0} {...field} placeholder="Enter Quantity" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {!isEdit && (
+              <FormField
+                control={form.control}
+                name="quantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Opening Quantity <span className="text-destructive">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input type="number" step="any" min={0} {...field} placeholder="Enter opening quantity" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             <FormField
               control={form.control}
               name="cost_price"
@@ -266,15 +289,24 @@ export default function ProductForm() {
             />
             <FormField
               control={form.control}
-              name="department"
+              name="category_id"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    Product Department <span className="text-destructive">*</span>
+                    Category <span className="text-destructive">*</span>
                   </FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="Enter Department" />
-                  </FormControl>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {toSelectOptions(categories.data).map((o) => (
+                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

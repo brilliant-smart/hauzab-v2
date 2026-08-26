@@ -45,13 +45,13 @@ class DatabaseSeeder extends Seeder
         // a dispensing business so the two tenants visibly differ.
         $catalog = [
             'supermarket' => [
-                'units' => ['Carton', 'Piece', 'Box', 'Bag'],
+                'units' => ['Pieces', 'Sachet', 'Pack', 'Carton', 'Crate', 'Roll', 'Dozen', 'Bottle', 'Tin', 'Box', 'Bag', 'Sack', 'Gallon', 'Keg', 'Custard-basin', 'Mudu', 'Kongo', 'Derica', 'Bundle', 'Pair', 'Set'],
                 'categories' => ['Provisions', 'Drinks', 'Toiletries', 'Household'],
                 'manufacturers' => ['Nestle Nigeria', 'Dangote', 'Unilever'],
                 'suppliers' => ['Lagos Wholesale Depot', 'Northern Distributors'],
             ],
             'pharmacy' => [
-                'units' => ['Tablet', 'Bottle', 'Strip', 'Pack'],
+                'units' => ['Pieces', 'Sachet', 'Pack', 'Carton', 'Crate', 'Roll', 'Dozen', 'Bottle', 'Tin', 'Box', 'Bag', 'Sack', 'Gallon', 'Keg', 'Custard-basin', 'Mudu', 'Kongo', 'Derica', 'Bundle', 'Pair', 'Set', 'Tablet', 'Strip'],
                 'categories' => ['Analgesics', 'Antibiotics', 'Vitamins', 'Topicals'],
                 'manufacturers' => ['Emzor Pharma', 'May & Baker', 'Fidson'],
                 'suppliers' => ['Pharmaceutical Distributors Ltd', 'Healthline Supplies'],
