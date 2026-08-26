@@ -237,7 +237,7 @@ export default function MakeSale() {
     <div className="space-y-4">
       <PageHeader title="Make Sale" />
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
+      <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
         {/* Product picker — scan or search in one field. */}
         <div className="space-y-2">
           <ProductScanSearchField scan={scan} />
