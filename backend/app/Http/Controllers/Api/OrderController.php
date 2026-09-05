@@ -31,7 +31,7 @@ class OrderController extends Controller
         $user = $request->user();
 
         $orders = Order::query()
-            ->with(['items', 'payments', 'customer', 'user'])
+            ->with(['items.unit', 'items', 'payments', 'customer', 'user'])
             ->when($request->filled('search'), function ($q) use ($request) {
                 $term = $request->string('search');
                 $q->where(fn ($inner) => $inner
@@ -62,7 +62,7 @@ class OrderController extends Controller
         // The sync engine relies on this to avoid double-posting.
         $existing = Order::where('uuid', $data['uuid'])->first();
         if ($existing) {
-            return (new OrderResource($existing->load(['items', 'payments', 'customer', 'user', 'tenant', 'branch'])))
+            return (new OrderResource($existing->load(['items.unit', 'items', 'payments', 'customer', 'user', 'tenant', 'branch'])))
                 ->response()
                 ->setStatusCode(200);
         }
@@ -73,7 +73,7 @@ class OrderController extends Controller
             $user->branch_id,
             $user->id,
             $data['device_id'] ?? null,
-        )->load(['items', 'payments', 'customer', 'user', 'tenant', 'branch']);
+        )->load(['items.unit', 'items', 'payments', 'customer', 'user', 'tenant', 'branch']);
 
         // Queue the cloud push and audit entry once the sale is durable.
         // The duplicate-uuid return above ensures this only runs for new orders.
@@ -94,7 +94,7 @@ class OrderController extends Controller
 
     public function show(Order $order)
     {
-        return new OrderResource($order->load(['items', 'payments', 'customer', 'user', 'tenant', 'branch']));
+        return new OrderResource($order->load(['items.unit', 'items', 'payments', 'customer', 'user', 'tenant', 'branch']));
     }
 
     public function void(Request $request, Order $order)
@@ -112,16 +112,22 @@ class OrderController extends Controller
                 if (! $item->product_id) {
                     continue;
                 }
+                // Restore the base units that were actually decremented: a carton
+                // line removed qty * factor, so the void restores the same.
+                $factor = $item->factor !== null ? (string) $item->factor : '1';
+                $baseQty = bcmul((string) $item->quantity, $factor, 4);
                 $this->movements->record(
                     $order->tenant_id,
                     $item->product_id,
                     'void',
-                    (string) $item->quantity,
+                    $baseQty,
                     $order->user_id,
                     [
                         'reference_type' => 'order',
                         'reference_id' => $order->id,
                         'date' => $date,
+                        'unit_id' => $item->unit_id,
+                        'factor' => $item->factor,
                     ],
                 );
             }
@@ -139,7 +145,7 @@ class OrderController extends Controller
             AuditLog::record('order.voided', $order);
         });
 
-        return new OrderResource($order->load(['items', 'payments', 'customer', 'user', 'tenant', 'branch']));
+        return new OrderResource($order->load(['items.unit', 'items', 'payments', 'customer', 'user', 'tenant', 'branch']));
     }
 
     private function validated(Request $request): array
@@ -151,6 +157,9 @@ class OrderController extends Controller
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'integer', 'exists:products,id'],
             'items.*.quantity' => ['required', 'numeric', 'min:0.0001'],
+            // Optional sale unit (e.g. a carton). The factor is resolved server-side
+            // from the product's sale_units, so it is not accepted from the client.
+            'items.*.unit_id' => ['nullable', 'integer'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
             'discount' => ['nullable', 'numeric', 'min:0'],
             'payments' => ['required', 'array', 'min:1'],

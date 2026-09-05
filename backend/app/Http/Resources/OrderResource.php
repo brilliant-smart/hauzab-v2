@@ -34,6 +34,11 @@ class OrderResource extends JsonResource
                 'product_name' => $i->product_name,
                 'barcode' => $i->barcode,
                 'quantity' => $i->quantity,
+                // The sale unit a line was rung up in (null = base unit, factor 1),
+                // so a receipt reads "1 Carton" while the ledger decremented 24.
+                'unit_id' => $i->unit_id,
+                'factor' => $i->factor,
+                'unit' => $i->unit?->only(['id', 'name']),
                 'unit_price' => $i->unit_price,
                 'line_total' => $i->line_total,
             ])),

@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\ProductManufacturerController;
 use App\Http\Controllers\Api\ProductSupplierController;
 use App\Http\Controllers\Api\ProductUnitController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\SaleUnitController;
 use App\Http\Controllers\Api\StockMovementController;
 use App\Http\Controllers\Api\SyncController;
 use App\Http\Controllers\Api\UserController;
@@ -54,6 +55,10 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('role:admin|supervisor|inventory_manager');
     Route::get('products/{product}', [ProductController::class, 'show']);
 
+    // A product's non-base sale units (e.g. a Carton of 24). Read is open to any
+    // signed-in staff so the POS can offer cartons; write is admin/supervisor.
+    Route::get('products/{product}/sale-units', [SaleUnitController::class, 'index']);
+
     Route::get('product-units', [ProductUnitController::class, 'index']);
     Route::get('product-categories', [ProductCategoryController::class, 'index']);
     Route::get('product-manufacturers', [ProductManufacturerController::class, 'index']);
@@ -79,6 +84,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('products/{product}', [ProductController::class, 'update']);
         Route::delete('products/{product}', [ProductController::class, 'destroy']);
 
+        // Sale-unit configuration (carton factor + price) is a pricing decision:
+        // admin and supervisor only, not the products-only Inventory Manager.
+        Route::post('products/{product}/sale-units', [SaleUnitController::class, 'store'])->middleware('role:admin|supervisor');
+        Route::delete('products/{product}/sale-units/{saleUnit}', [SaleUnitController::class, 'destroy'])->middleware('role:admin|supervisor');
+
         Route::apiResource('product-units', ProductUnitController::class)->except(['index']);
         Route::apiResource('product-categories', ProductCategoryController::class)->except(['index']);
         Route::apiResource('product-manufacturers', ProductManufacturerController::class)->except(['index']);
@@ -92,6 +102,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('products/{product}/stock-received', [StockMovementController::class, 'received']);
         Route::post('products/{product}/write-off', [StockMovementController::class, 'writeOff']);
         Route::post('products/{product}/stock-count', [StockMovementController::class, 'count']);
+        Route::post('products/{product}/repackage', [StockMovementController::class, 'transfer']);
         Route::get('stock-movements/export', [StockMovementController::class, 'export'])->middleware('role:admin');
         Route::get('stock-movements', [StockMovementController::class, 'index']);
     });

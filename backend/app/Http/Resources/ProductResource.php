@@ -34,6 +34,15 @@ class ProductResource extends JsonResource
             'unit' => $this->whenLoaded('unit', fn () => $this->unit?->only(['id', 'name'])),
             'manufacturer' => $this->whenLoaded('manufacturer', fn () => $this->manufacturer?->only(['id', 'name'])),
             'supplier' => $this->whenLoaded('supplier', fn () => $this->supplier?->only(['id', 'name'])),
+            // Non-base sale units (e.g. a Carton of 24). The base unit is implicit
+            // at factor 1; the POS offers these as alternative sale units.
+            'sale_units' => $this->whenLoaded('saleUnits', fn () => $this->saleUnits->map(fn ($u) => [
+                'id' => $u->id,
+                'unit_id' => $u->unit_id,
+                'unit' => $u->unit?->only(['id', 'name']),
+                'factor' => $u->factor,
+                'selling_price' => $u->selling_price,
+            ])),
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];

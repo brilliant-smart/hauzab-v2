@@ -67,7 +67,7 @@ describe("toVM normalization", () => {
     expect(vm.isProvisional).toBe(false);
     expect(vm.number).toBe("INV-000001");
     expect(vm.statusLabel).toBe("Completed");
-    expect(vm.items[0]).toEqual({ name: "Soda", qty: 2, unitPrice: 50, lineTotal: 100 });
+    expect(vm.items[0]).toEqual({ name: "Soda", qty: 2, unitPrice: 50, lineTotal: 100, unitName: null });
     expect(vm.payments).toEqual([{ method: "cash", amount: 100 }]);
   });
 

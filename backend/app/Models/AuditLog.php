@@ -49,6 +49,9 @@ class AuditLog extends Model
         'stock.count' => 'Stock count',
         'stock.transfer' => 'Stock transfer',
 
+        'sale_unit.created' => 'Sale unit added',
+        'sale_unit.deleted' => 'Sale unit removed',
+
         'order.created' => 'Sale recorded',
         'order.voided' => 'Sale voided',
 

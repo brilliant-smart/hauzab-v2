@@ -131,11 +131,59 @@ class StockMovementController extends Controller
         return response()->json(['data' => $movement->load(['product', 'user'])], 201);
     }
 
+    /**
+     * Record a break-bulk / repackage event (e.g. opening cartons into singles).
+     * Stock is one base-unit number, so repackaging moves no stock — the cartons
+     * and the singles they become are the same base units. The movement row (with
+     * its unit/factor context) is the auditor-visible record that it happened.
+     */
+    public function transfer(Request $request, Product $product)
+    {
+        $data = $request->validate([
+            'unit_id' => [
+                'required', 'integer',
+                function (string $attr, $value, $fail) use ($product, $request) {
+                    if (! $product->saleUnits()->where('unit_id', $value)->exists()) {
+                        $fail('The selected unit is not a configured sale unit for this product.');
+                    }
+                },
+            ],
+            'quantity' => ['required', 'numeric', 'gt:0'],
+            'note' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $user = $request->user();
+        $saleUnit = $product->saleUnits()->where('unit_id', $data['unit_id'])->first();
+        $qty = (string) $data['quantity'];
+
+        $movement = DB::transaction(function () use ($user, $product, $data, $saleUnit, $qty) {
+            $m = $this->movements->record(
+                $user->tenant_id, $product->id, 'transfer', '0', $user->id,
+                [
+                    'unit_id' => $saleUnit->unit_id,
+                    'factor' => (string) $saleUnit->factor,
+                    'note' => $data['note'] ?? null,
+                ]
+            );
+
+            DB::afterCommit(fn () => AuditLog::record(
+                'stock.transfer', $product,
+                ['quantity' => $qty, 'unit' => $saleUnit->unit?->name, 'factor' => $saleUnit->factor],
+                $product->name,
+                "Repackaged {$qty} × {$saleUnit->unit?->name} of {$product->name}"
+            ));
+
+            return $m;
+        });
+
+        return response()->json(['data' => $movement->load(['product', 'user', 'unit'])], 201);
+    }
+
     /** Paginated stock-movements ledger — filterable by type, product, and date. */
     public function index(Request $request)
     {
         $movements = StockMovement::query()
-            ->with(['product', 'user'])
+            ->with(['product', 'user', 'unit'])
             ->when($request->filled('type'), fn ($q) => $q->where('type', $request->string('type')))
             ->when($request->filled('product_id'), fn ($q) => $q->where('product_id', $request->integer('product_id')))
             ->when($request->filled('from'), fn ($q) => $q->whereDate('created_at', '>=', $request->string('from')))
@@ -170,7 +218,7 @@ class StockMovementController extends Controller
         $widths = array_map('strlen', $headers);
 
         $movements = StockMovement::query()
-            ->with(['product', 'user'])
+            ->with(['product', 'user', 'unit'])
             ->when($request->filled('type'), fn ($q) => $q->where('type', $request->string('type')))
             ->when($request->filled('product_id'), fn ($q) => $q->where('product_id', $request->integer('product_id')))
             ->when($request->filled('from'), fn ($q) => $q->whereDate('created_at', '>=', $request->string('from')))

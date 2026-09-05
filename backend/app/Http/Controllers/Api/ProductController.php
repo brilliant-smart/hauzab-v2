@@ -34,7 +34,7 @@ class ProductController extends Controller
     public function index(Request $request)
     {
         $products = Product::query()
-            ->with(['category', 'unit', 'manufacturer', 'supplier'])
+            ->with(['category', 'unit', 'manufacturer', 'supplier', 'saleUnits.unit'])
             ->when($request->filled('search'), function ($q) use ($request) {
                 $term = $request->string('search');
                 $q->where(fn ($inner) => $inner
@@ -105,7 +105,7 @@ class ProductController extends Controller
 
     public function show(Product $product)
     {
-        return new ProductResource($product->load(['category', 'unit', 'manufacturer', 'supplier']));
+        return new ProductResource($product->load(['category', 'unit', 'manufacturer', 'supplier', 'saleUnits.unit']));
     }
 
     public function update(Request $request, Product $product)
@@ -470,12 +470,13 @@ class ProductController extends Controller
         $creating = $product === null;
 
         $data = $request->validate([
-            // Create-time name uniqueness blocks new duplicates at the root cause.
-            // Edit-time uniqueness is deferred until the legacy duplicates are
-            // resolved manually (rename the survivor, retire the redundant row).
-            'name' => $creating
-                ? ['required', 'string', 'max:191', Rule::unique('products')->where('tenant_id', $tenantId)]
-                : ['required', 'string', 'max:191'],
+            // Name uniqueness within the tenant on both create and edit: create
+            // blocks new duplicates at the root cause, edit closes the rename
+            // loophole (renaming a product to a name another already has is the
+            // other way duplicates appear). The legacy duplicates are resolved by
+            // renaming survivors to fresh harmonized names and retiring the
+            // redundant rows, so this never blocks that consolidation.
+            'name' => ['required', 'string', 'max:191', Rule::unique('products')->where('tenant_id', $tenantId)->ignore($product?->id)],
             'description' => ['nullable', 'string'],
             'size' => ['nullable', 'string', 'max:120'],
             'model' => ['nullable', 'string', 'max:120'],

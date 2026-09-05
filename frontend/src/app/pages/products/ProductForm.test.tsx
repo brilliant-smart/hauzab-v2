@@ -25,6 +25,14 @@ vi.mock("@/app/api/catalog", () => ({
   useUploadProductImage: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
+// ProductForm reads the signed-in user to gate the sale-units section. A staff
+// user is below supervisor, so the section stays hidden — these tests cover the
+// catalog fields, not sale-unit config.
+vi.mock("@/app/auth/AuthContext", () => ({
+  AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useAuth: () => ({ user: { id: 1, tenant_id: 1, role: "staff" }, token: "t", isAuthenticated: true, loading: false }),
+}));
+
 import ProductForm from "@/app/pages/products/ProductForm";
 import { useProduct } from "@/app/api/catalog";
 

@@ -47,7 +47,7 @@ describe("useCart", () => {
   it("sets quantity and drops a line when qty hits zero", () => {
     const { result } = renderHookWithProviders(() => useCart());
     act(() => result.current.add(product()));
-    act(() => result.current.setQty(1, 0));
+    act(() => result.current.setQty(1, null, 0));
     expect(result.current.items).toEqual([]);
   });
 
@@ -55,9 +55,45 @@ describe("useCart", () => {
     const { result } = renderHookWithProviders(() => useCart());
     act(() => result.current.add(product({ id: 1, name: "Soda" })));
     act(() => result.current.add(product({ id: 2, name: "Bread", selling_price: "40" })));
-    act(() => result.current.remove(1));
+    act(() => result.current.remove(1, null));
     expect(result.current.items).toHaveLength(1);
     expect(result.current.items[0].name).toBe("Bread");
+  });
+
+  it("keeps base-unit and carton lines of one product as separate lines", () => {
+    const { result } = renderHookWithProviders(() => useCart());
+    // A product that sells as singles (base) and a carton of 12.
+    const cartonProduct = product({
+      id: 7,
+      name: "Juice",
+      quantity: "120",
+      sale_units: [
+        { id: 1, unit_id: 99, unit: { id: 99, name: "Carton" }, factor: "12", selling_price: "1100" },
+      ],
+    });
+    // Scan the product (base line), then switch it to the carton — the line is
+    // converted in place to a carton line (no base line remains yet).
+    act(() => result.current.add(cartonProduct));
+    act(() => result.current.setUnit(7, null, 99));
+    expect(result.current.items).toHaveLength(1);
+    expect(result.current.items[0].unitId).toBe(99);
+    expect(result.current.items[0].factor).toBe(12);
+
+    // Scan again — since no base line exists, a new base line is created and
+    // now coexists with the carton line. The dedup key is (productId, unitId),
+    // not just productId, so singles and cartons of one product stay separate.
+    act(() => result.current.add(cartonProduct));
+    expect(result.current.items).toHaveLength(2);
+    expect(result.current.items.find((l) => l.unitId === null)?.factor).toBe(1);
+    expect(result.current.items.find((l) => l.unitId === 99)?.factor).toBe(12);
+    expect(result.current.count).toBe(2);
+
+    // A third scan merges into the base line only — the carton line is
+    // untouched.
+    act(() => result.current.add(cartonProduct));
+    expect(result.current.items).toHaveLength(2);
+    expect(result.current.items.find((l) => l.unitId === null)?.qty).toBe(2);
+    expect(result.current.items.find((l) => l.unitId === 99)?.qty).toBe(1);
   });
 
   it("clears the cart", () => {

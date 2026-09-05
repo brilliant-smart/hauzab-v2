@@ -48,6 +48,7 @@ class OrderPersistence
         return DB::transaction(function () use ($data, $tenantId, $branchId, $userId, $deviceId) {
             $productIds = collect($data['items'])->pluck('product_id')->unique()->all();
             $products = Product::query()
+                ->with('saleUnits')
                 ->lockForUpdate()
                 ->whereIn('id', $productIds)
                 ->get()
@@ -72,12 +73,34 @@ class OrderPersistence
                     abort(422, "Product {$product->name} has expired and cannot be sold.");
                 }
 
-                if (bccomp($qty, (string) $product->quantity) > 0) {
+                // A line may be rung up in a non-base sale unit (e.g. a carton).
+                // The factor is server-authoritative: when a unit is given it must
+                // be one of the product's configured sale units, and its factor
+                // converts the sale-unit quantity into the base units that stock is
+                // held and decremented in. Base unit = no unit_id, factor 1.
+                $unitId = $line['unit_id'] ?? null;
+                if ($unitId !== null) {
+                    $saleUnit = $product->saleUnits->firstWhere('unit_id', $unitId);
+                    if (! $saleUnit) {
+                        abort(422, "Invalid sale unit for {$product->name}.");
+                    }
+                    $factor = (string) $saleUnit->factor;
+                } else {
+                    $saleUnit = null;
+                    $factor = '1';
+                    $unitId = null;
+                }
+
+                $baseQty = bcmul($qty, $factor, 4);
+
+                if (bccomp($baseQty, (string) $product->quantity) > 0) {
                     abort(422, "Insufficient stock for {$product->name}.");
                 }
 
-                // Price is floored at cost so the register can never sell at a loss.
-                $unitPrice = max($line['unit_price'], (float) $product->cost_price);
+                // Price is floored at the unit's cost (cost_price * factor for a
+                // carton) so the register can never sell at a loss in any unit.
+                $minUnitPrice = bcmul((string) $product->cost_price, $factor, 4);
+                $unitPrice = max($line['unit_price'], (float) $minUnitPrice);
                 $lineTotal = bcmul($qty, (string) $unitPrice, 4);
 
                 $subtotal = bcadd($subtotal, $lineTotal, 4);
@@ -87,6 +110,8 @@ class OrderPersistence
                     'product_name' => $product->name,
                     'barcode' => $product->barcode,
                     'quantity' => $qty,
+                    'unit_id' => $unitId,
+                    'factor' => $factor !== '1' ? $factor : null,
                     'unit_price' => $unitPrice,
                     'cost_price' => $product->cost_price,
                     'line_total' => $lineTotal,
@@ -96,9 +121,11 @@ class OrderPersistence
                 // the product, hard-blocks negatives, appends the stock_movements
                 // row, bumps the daily card, and persists the new quantity. The
                 // card opening captures pre-sale stock since the service mutates
-                // only after bumping the card.
-                $this->movements->record($tenantId, $product->id, 'sale', bcmul($qty, '-1', 4), $userId, [
+                // only after bumping the card. The delta is in base units.
+                $this->movements->record($tenantId, $product->id, 'sale', bcmul($baseQty, '-1', 4), $userId, [
                     'reference_type' => 'order',
+                    'unit_id' => $unitId,
+                    'factor' => $factor !== '1' ? $factor : null,
                 ]);
             }
 

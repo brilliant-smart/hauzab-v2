@@ -13,7 +13,10 @@ import {
 } from "@/app/api/catalog";
 import { NamedResource, ContactResource } from "@/app/api/types";
 import { handleApiError } from "@/app/lib/errorHandler";
+import { useAuth } from "@/app/auth/AuthContext";
+import { isAtLeast } from "@/app/auth/guards";
 import { PageHeader } from "@/components/PageHeader";
+import { SaleUnitsSection } from "@/app/pages/products/SaleUnitsSection";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
@@ -77,6 +80,7 @@ export default function ProductForm() {
   const { id } = useParams();
   const isEdit = !!id;
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const { data: product } = useProduct(id ? Number(id) : undefined);
   const manufacturers = useLookupList("product-manufacturers");
@@ -443,6 +447,18 @@ export default function ProductForm() {
               )}
             />
           </div>
+
+          {/* Sale units (carton etc.) — only once the product exists and has a
+              base unit, and only for admins/supervisors: pricing the carton is a
+              pricing decision, not a catalog-edit one. */}
+          {isEdit && product?.unit_id && isAtLeast(user, "supervisor") && (
+            <SaleUnitsSection
+              productId={product.id}
+              baseUnitId={product.unit_id}
+              baseUnitName={product.unit?.name ?? "Piece"}
+              costPrice={Number(product.cost_price)}
+            />
+          )}
 
           <div className="flex items-center justify-end gap-2">
             <Button type="button" variant="outline" asChild>

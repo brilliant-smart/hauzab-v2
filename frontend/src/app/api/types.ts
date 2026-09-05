@@ -41,8 +41,21 @@ export interface Product {
   unit?: { id: number; name: string } | null;
   manufacturer?: { id: number; name: string } | null;
   supplier?: { id: number; name: string } | null;
+  /**
+   * Non-base sale units (e.g. a Carton of 24). The base unit itself is not a
+   * row here — it is the product's own unit_id at factor 1.
+   */
+  sale_units?: ProductSaleUnit[];
   created_at?: string;
   updated_at?: string;
+}
+
+export interface ProductSaleUnit {
+  id: number;
+  unit_id: number;
+  unit?: { id: number; name: string } | null;
+  factor: string;
+  selling_price: string;
 }
 
 export interface UserProfile {
@@ -121,6 +134,9 @@ export interface OrderItem {
   product_name: string;
   barcode?: string | null;
   quantity: string;
+  unit_id?: number | null;
+  factor?: string | null;
+  unit?: { id: number; name: string } | null;
   unit_price: string;
   line_total: string;
 }
@@ -168,7 +184,14 @@ export interface Order {
 
 export interface CreateOrderPayload {
   uuid: string;
-  items: { product_id: number; product_name?: string; quantity: number; unit_price: number }[];
+  items: {
+    product_id: number;
+    product_name?: string;
+    quantity: number;
+    unit_price: number;
+    /** Optional sale unit (e.g. a carton). Null/omitted = base unit. */
+    unit_id?: number | null;
+  }[];
   discount?: number;
   payments: { method: PaymentMethodValue; amount: number }[];
   customer_id?: number | null;
@@ -194,7 +217,7 @@ export interface ProvisionalOrder {
   amount_paid: number;
   change: number;
   customer_name: string | null;
-  items: { product_name: string; quantity: number; unit_price: number; line_total: number }[];
+  items: { product_name: string; quantity: number; unit_price: number; line_total: number; unit_name?: string | null }[];
   payments: { method: PaymentMethodValue; amount: number }[];
   tenant?: {
     id: number;

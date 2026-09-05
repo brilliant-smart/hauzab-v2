@@ -115,6 +115,7 @@ export default function MakeSale() {
       quantity: l.qty,
       unit_price: l.price,
       line_total: l.qty * l.price,
+      unit_name: l.unitId === null ? null : l.unitName,
     })),
     payments,
     tenant: user?.tenant
@@ -152,6 +153,7 @@ export default function MakeSale() {
         product_name: l.name,
         quantity: l.qty,
         unit_price: l.price,
+        unit_id: l.unitId,
       })),
       discount,
       payments,
@@ -284,8 +286,12 @@ export default function MakeSale() {
                 Cart is empty. Scan or search to add a product.
               </p>
             )}
-            {cart.items.map((line) => (
-              <div key={line.productId} className="space-y-1 rounded-md border p-2">
+            {cart.items.map((line) => {
+              const key = `${line.productId}-${line.unitId ?? "base"}`;
+              const maxQty = Math.floor(line.stock / line.factor);
+              const priceFloor = line.costPrice * line.factor;
+              return (
+              <div key={key} className="space-y-1 rounded-md border p-2">
                 <div className="flex items-start justify-between gap-2">
                   <span className="text-sm font-medium leading-tight">{line.name}</span>
                   <Button
@@ -293,11 +299,34 @@ export default function MakeSale() {
                     size="icon"
                     className="size-6"
                     aria-label={`Remove ${line.name} from cart`}
-                    onClick={() => cart.remove(line.productId)}
+                    onClick={() => cart.remove(line.productId, line.unitId)}
                   >
                     <X className="size-3.5" />
                   </Button>
                 </div>
+                {line.options.length > 1 && (
+                  <Select
+                    value={line.unitId === null ? "base" : String(line.unitId)}
+                    onValueChange={(v) =>
+                      cart.setUnit(line.productId, line.unitId, v === "base" ? null : Number(v))
+                    }
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {line.options.map((o) => (
+                        <SelectItem
+                          key={String(o.unitId ?? "base")}
+                          value={o.unitId === null ? "base" : String(o.unitId)}
+                        >
+                          {o.name}
+                          {o.factor > 1 ? ` (×${o.factor})` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
                 <div className="flex items-center gap-2">
                   <div className="flex items-center">
                     <Button
@@ -305,18 +334,18 @@ export default function MakeSale() {
                       size="icon"
                       className="size-7"
                       aria-label={`Decrease ${line.name} quantity`}
-                      onClick={() => cart.setQty(line.productId, line.qty - 1)}
+                      onClick={() => cart.setQty(line.productId, line.unitId, line.qty - 1)}
                     >
                       <Minus className="size-3" />
                     </Button>
                     <Input
                       type="number"
                       min={1}
-                      max={line.stock}
+                      max={maxQty}
                       value={line.qty}
                       aria-label={`${line.name} quantity`}
                       onChange={(e) =>
-                        cart.setQty(line.productId, Number(e.target.value) || 0)
+                        cart.setQty(line.productId, line.unitId, Number(e.target.value) || 0)
                       }
                       className="h-7 w-12 rounded-none border-x text-center"
                     />
@@ -325,7 +354,7 @@ export default function MakeSale() {
                       size="icon"
                       className="size-7"
                       aria-label={`Increase ${line.name} quantity`}
-                      onClick={() => cart.setQty(line.productId, line.qty + 1)}
+                      onClick={() => cart.setQty(line.productId, line.unitId, line.qty + 1)}
                     >
                       <Plus className="size-3" />
                     </Button>
@@ -333,11 +362,15 @@ export default function MakeSale() {
                   <span className="text-xs text-muted-foreground">×</span>
                   <Input
                     type="number"
-                    min={line.costPrice}
+                    min={priceFloor}
                     step="0.01"
                     value={line.price}
                     onChange={(e) =>
-                      cart.setPrice(line.productId, Math.max(line.costPrice, Number(e.target.value) || 0))
+                      cart.setPrice(
+                        line.productId,
+                        line.unitId,
+                        Math.max(priceFloor, Number(e.target.value) || 0),
+                      )
                     }
                     className="h-7 w-24"
                   />
@@ -346,7 +379,8 @@ export default function MakeSale() {
                   </span>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
 
           <Separator />

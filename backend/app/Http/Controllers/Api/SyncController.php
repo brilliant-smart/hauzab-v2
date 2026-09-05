@@ -128,16 +128,21 @@ class SyncController extends Controller
                 if (! $item->product_id) {
                     continue;
                 }
+                // Restore the base units actually decremented (qty * factor).
+                $factor = $item->factor !== null ? (string) $item->factor : '1';
+                $baseQty = bcmul((string) $item->quantity, $factor, 4);
                 $this->movements->record(
                     $order->tenant_id,
                     $item->product_id,
                     'void',
-                    (string) $item->quantity,
+                    $baseQty,
                     $order->user_id,
                     [
                         'reference_type' => 'order',
                         'reference_id' => $order->id,
                         'date' => $date,
+                        'unit_id' => $item->unit_id,
+                        'factor' => $item->factor,
                     ],
                 );
             }

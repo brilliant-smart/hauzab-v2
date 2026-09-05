@@ -48,7 +48,7 @@ export interface ReceiptVM {
     phone?: string | null;
     email?: string | null;
   } | null;
-  items: { name: string; qty: number; unitPrice: number; lineTotal: number }[];
+  items: { name: string; qty: number; unitPrice: number; lineTotal: number; unitName?: string | null }[];
   subtotal: number;
   discount: number;
   total: number;
@@ -73,6 +73,7 @@ export function toVM(order: ReceiptOrder): ReceiptVM {
         qty: i.quantity,
         unitPrice: i.unit_price,
         lineTotal: i.line_total,
+        unitName: i.unit_name ?? null,
       })),
       subtotal: p.subtotal,
       discount: p.discount,
@@ -96,6 +97,7 @@ export function toVM(order: ReceiptOrder): ReceiptVM {
       qty: Number(i.quantity),
       unitPrice: Number(i.unit_price),
       lineTotal: Number(i.line_total),
+      unitName: i.unit?.name ?? null,
     })),
     subtotal: Number(o.subtotal),
     discount: Number(o.discount),
@@ -187,7 +189,7 @@ function ReceiptBody({ vm, format }: { vm: ReceiptVM; format: ReceiptFormat }) {
               <td>
                 <div>{item.name}</div>
                 <div style={{ opacity: 0.8 }}>
-                  {item.qty} x {money(item.unitPrice)}
+                  {item.qty}{item.unitName ? ` ${item.unitName}` : ""} x {money(item.unitPrice)}
                 </div>
               </td>
               <td style={{ textAlign: "right" }}>{money(item.lineTotal)}</td>
