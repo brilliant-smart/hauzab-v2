@@ -142,12 +142,16 @@ function ReceiptBody({ vm, format }: { vm: ReceiptVM; format: ReceiptFormat }) {
       }}
     >
       <div style={{ textAlign: "center" }}>
-        <div style={{ fontWeight: 700, fontSize: cfg.font + 2 }}>
+        <div style={{ fontWeight: 800, fontSize: cfg.font + 6 }}>
           {tenant?.name ?? "Hauzab"}
         </div>
-        {tenant?.address && <div>{tenant.address}</div>}
+        {tenant?.address && (
+          <div style={{ textAlign: "left", fontSize: cfg.font - 1 }}>
+            {tenant.address}
+          </div>
+        )}
         {(tenant?.phone || tenant?.email) && (
-          <div>
+          <div style={{ textAlign: "left", fontSize: cfg.font - 1 }}>
             {[tenant?.phone, tenant?.email].filter(Boolean).join(" · ")}
           </div>
         )}

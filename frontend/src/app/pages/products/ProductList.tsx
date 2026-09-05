@@ -66,9 +66,9 @@ export default function ProductList() {
       cell: (p) => p.name,
     },
     {
-      key: "size",
-      header: "Size",
-      cell: (p) => p.size ?? "—",
+      key: "unit",
+      header: "Unit",
+      cell: (p) => p.unit?.name ?? p.size ?? "—",
     },
     {
       key: "quantity",

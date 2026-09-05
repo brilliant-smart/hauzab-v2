@@ -16,12 +16,13 @@ export function handleApiError(error: unknown, fallbackMessage = "An unexpected 
   if (error instanceof AxiosError) {
     const data = error.response?.data as ApiErrorResponse | undefined;
 
-    if (data?.message) {
-      message = data.message;
-    } else if (data?.errors) {
-      // Flatten Laravel validation errors
+    if (data?.errors && Object.keys(data.errors).length > 0) {
+      // List every failed rule — Laravel's summary message only quotes the
+      // first error ("... (and 2 more errors)"), which hides the rest.
       const flatErrors = Object.values(data.errors).flat();
       message = flatErrors.join(" ");
+    } else if (data?.message) {
+      message = data.message;
     } else if (error.response?.status === 401) {
       message = "Your session has expired. Please log in again.";
     } else if (error.response?.status === 403) {

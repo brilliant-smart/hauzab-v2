@@ -36,7 +36,9 @@ class ProductController extends Controller
         $products = Product::query()
             ->with(['category', 'unit', 'manufacturer', 'supplier', 'saleUnits.unit'])
             ->when($request->filled('search'), function ($q) use ($request) {
-                $term = $request->string('search');
+                // Normalize the term the same way names are stored, so a search
+                // with stray spaces still matches the single-spaced name.
+                $term = $request->string('search')->replaceMatches('/\s+/u', ' ')->trim();
                 $q->where(fn ($inner) => $inner
                     ->where('name', 'like', "%{$term}%")
                     ->orWhere('barcode', 'like', "%{$term}%")
@@ -259,7 +261,7 @@ class ProductController extends Controller
 
         foreach ($dataRows as $i => $row) {
             $rowNo = $i + 2;
-            $name = trim((string) $this->cell($row, $colMap, $aliases['name']));
+            $name = static::normalizedName((string) $this->cell($row, $colMap, $aliases['name']));
 
             if ($name === '') {
                 $skipped++;
@@ -300,7 +302,7 @@ class ProductController extends Controller
                     continue;
                 }
 
-                DB::transaction(function () use ($rowData, $user, $tenantId, $batchId, &$imported, &$updated) {
+                DB::transaction(function () use ($rowData, $user, $tenantId, $batchId, $rowNo, $name, &$imported, &$updated, &$skipped, &$errors) {
                     $barcode = $rowData['barcode'] !== '' ? $rowData['barcode'] : null;
                     $existing = $barcode
                         ? Product::where('tenant_id', $tenantId)->where('barcode', $barcode)->first()
@@ -334,6 +336,17 @@ class ProductController extends Controller
 
                         $updated++;
                     } else {
+                        // An import row is also a duplicate source: a row whose
+                        // name already exists (matched case/space-insensitively
+                        // by the DB collation) must never create a second
+                        // product with that name.
+                        if (Product::where('tenant_id', $tenantId)->where('name', $rowData['name'])->exists()) {
+                            $skipped++;
+                            $errors[] = "Row {$rowNo} ({$name}): a product with this name already exists";
+
+                            return;
+                        }
+
                         $createData = array_merge($rowData, ['tenant_id' => $tenantId, 'is_active' => true]);
                         // reorder_level is NOT NULL with a DB default; an explicit
                         // null would violate it, so coerce to 0 when the row omits it.
@@ -428,7 +441,10 @@ class ProductController extends Controller
     {
         $val = $this->cell($row, $colMap, $aliases);
 
-        return $val === null || trim((string) $val) === '' ? null : trim((string) $val);
+        // Lookups resolve by name, so their names are canonicalized the same
+        // way product names are — a double-spaced cell must not create a
+        // "different" category/unit/manufacturer row.
+        return $val === null || trim((string) $val) === '' ? null : static::normalizedName((string) $val);
     }
 
     /**
@@ -468,6 +484,15 @@ class ProductController extends Controller
     {
         $tenantId = $request->user()->tenant_id;
         $creating = $product === null;
+
+        // Names are canonicalized before validation: trimmed and with internal
+        // whitespace collapsed to single spaces. Without this, "Coke  60cl"
+        // (double space) would pass the uniqueness rule yet display and search
+        // as "Coke 60cl" — the exact class of duplicate the rule exists to
+        // block. The stored name is always the clean form.
+        if ($request->filled('name')) {
+            $request->merge(['name' => static::normalizedName($request->input('name'))]);
+        }
 
         $data = $request->validate([
             // Name uniqueness within the tenant on both create and edit: create
@@ -535,5 +560,11 @@ class ProductController extends Controller
         }
 
         return $data;
+    }
+
+    /** Trim and collapse internal whitespace runs to a single space. */
+    private static function normalizedName(string $name): string
+    {
+        return trim((string) preg_replace('/\s+/u', ' ', $name));
     }
 }

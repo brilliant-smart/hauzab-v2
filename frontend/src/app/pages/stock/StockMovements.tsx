@@ -5,7 +5,7 @@ import { useStockMovements, downloadStockMovementsExport } from "@/app/api/stock
 import { useAuth } from "@/app/auth/AuthContext";
 import { isAdmin } from "@/app/auth/guards";
 import { handleApiError } from "@/app/lib/errorHandler";
-import { formatDate } from "@/app/lib/format";
+import { formatDate, formatNumber } from "@/app/lib/format";
 import { PageHeader } from "@/components/PageHeader";
 import { DataTable, Column } from "@/components/DataTable";
 import { Button } from "@/components/ui/button";
@@ -33,9 +33,10 @@ const NONE = "__all__";
 const TYPES = ["received", "sale", "void", "write_off", "count", "transfer"];
 
 function signed(value: string): string {
-  const n = Number(value);
-  if (Number.isNaN(n)) return value;
-  return n > 0 ? `+${n}` : String(n);
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  if (Number.isNaN(num)) return String(value);
+  if (num === 0) return "0";
+  return (num > 0 ? "+" : "") + formatNumber(num);
 }
 
 export default function StockMovements() {
@@ -95,9 +96,9 @@ export default function StockMovements() {
       },
     },
     { key: "product", header: "Product", cell: (r) => r.product?.name ?? "—" },
-    { key: "quantity_before", header: "Before", cell: (r) => r.quantity_before },
+    { key: "quantity_before", header: "Before", cell: (r) => formatNumber(r.quantity_before) },
     { key: "delta", header: "Delta", cell: (r) => signed(r.delta) },
-    { key: "quantity_after", header: "After", cell: (r) => r.quantity_after },
+    { key: "quantity_after", header: "After", cell: (r) => formatNumber(r.quantity_after) },
     { key: "reason", header: "Reason", cell: (r) => r.reason ?? "—" },
     { key: "note", header: "Note", cell: (r) => r.note ?? "—" },
     { key: "user", header: "User", cell: (r) => r.user?.name ?? "System" },
