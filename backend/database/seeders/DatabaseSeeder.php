@@ -152,6 +152,11 @@ class DatabaseSeeder extends Seeder
         }
 
         // A handful of products that exercise low-stock and expiry views.
+        // Dev/testing only — a real deployment contains only imported data.
+        if (app()->environment('production')) {
+            return;
+        }
+
         $samples = [
             ['name' => $catalog['categories'][0] . ' Sample A', 'qty' => 40, 'reorder' => 5, 'days' => 365],
             ['name' => $catalog['categories'][1] . ' Sample B', 'qty' => 2, 'reorder' => 10, 'days' => 365],
