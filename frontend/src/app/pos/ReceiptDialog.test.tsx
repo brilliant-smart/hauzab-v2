@@ -85,9 +85,10 @@ describe("ReceiptDialog rendering", () => {
     renderWithProviders(
       <ReceiptDialog order={serverOrder} open onOpenChange={vi.fn()} />,
     );
-    // The number shows in both the dialog title and the receipt body.
+    // The number shows in the title, the preview, and the hidden body-level
+    // print copy — at least one of each is enough.
     expect(screen.getAllByText(/INV-000001/).length).toBeGreaterThan(0);
-    expect(screen.getByText("COMPLETED")).toBeInTheDocument();
+    expect(screen.getAllByText("COMPLETED").length).toBeGreaterThan(0);
   });
 
   it("renders the provisional banner and number for an offline sale", () => {
@@ -95,7 +96,17 @@ describe("ReceiptDialog rendering", () => {
       <ReceiptDialog order={provisional} open onOpenChange={vi.fn()} />,
     );
     expect(screen.getAllByText(/PENDING-1/).length).toBeGreaterThan(0);
-    expect(screen.getByText("PENDING SYNC")).toBeInTheDocument();
+    expect(screen.getAllByText("PENDING SYNC").length).toBeGreaterThan(0);
+  });
+
+  it("renders the hidden print copy at body level while open", () => {
+    const { unmount } = renderWithProviders(
+      <ReceiptDialog order={serverOrder} open onOpenChange={vi.fn()} />,
+    );
+    expect(document.getElementById("receipt-print")).not.toBeNull();
+    expect(document.body.classList.contains("receipt-printing")).toBe(true);
+    unmount();
+    expect(document.body.classList.contains("receipt-printing")).toBe(false);
   });
 
   it("injects an @page rule sized to the chosen paper on print", async () => {

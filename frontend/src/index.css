@@ -12,6 +12,36 @@
 @tailwind utilities;
 
 /*
+ * Receipt printing. The dialog shows a live preview, but printing from inside
+ * a Radix overlay goes wrong on real thermal printers: the overlay is a
+ * fixed, centered, transformed element, so the print engine places the
+ * receipt at the overlay's offset — clipped edges and blank feed at the top.
+ * Instead, ReceiptDialog renders a hidden duplicate at body level
+ * (#receipt-print). On screen it stays invisible; while printing, it is the
+ * only visible element — a plain document that starts at the top edge of the
+ * page and stretches to the driver's reported printable width (thermal rolls
+ * are ~72mm printable inside an 80mm roll), so nothing is truncated.
+ */
+#receipt-print {
+  display: none;
+}
+
+@media print {
+  /* Only while a receipt is on screen (body.receipt-printing) — a stray
+     Ctrl+P elsewhere in the app prints the page normally. */
+  body.receipt-printing > *:not(#receipt-print) {
+    display: none !important;
+  }
+  body.receipt-printing #receipt-print {
+    display: block !important;
+  }
+  body.receipt-printing #receipt-print > * {
+    width: 100% !important;
+    box-sizing: border-box;
+  }
+}
+
+/*
  * Design tokens. Indigo is the brand primary — retune --primary to rebrand.
  * Neutrals are a cool slate ramp; semantic tones carry their own foreground
  * pair so text always meets contrast on either theme. Shadows are layered and

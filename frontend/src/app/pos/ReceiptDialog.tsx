@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Printer } from "lucide-react";
 import { Order, ProvisionalOrder, ReceiptOrder, PaymentMethodValue } from "@/app/api/types";
 import { formatCurrency } from "@/app/lib/format";
@@ -129,7 +130,6 @@ function ReceiptBody({ vm, format }: { vm: ReceiptVM; format: ReceiptFormat }) {
 
   return (
     <div
-      id="receipt-print"
       style={{
         width: cfg.width,
         padding: cfg.padding,
@@ -296,6 +296,14 @@ export function ReceiptDialog({ order, open, onOpenChange }: ReceiptDialogProps)
   const cfg = FORMAT_CONFIG[format];
   const vm = order ? toVM(order) : null;
 
+  // While the receipt is on screen, printing shows only the body-level copy —
+  // see the print rules in index.css.
+  useEffect(() => {
+    if (!open) return;
+    document.body.classList.add("receipt-printing");
+    return () => document.body.classList.remove("receipt-printing");
+  }, [open]);
+
   const handlePrint = () => {
     const styleId = "receipt-print-style";
     let style = document.getElementById(styleId) as HTMLStyleElement | null;
@@ -304,16 +312,14 @@ export function ReceiptDialog({ order, open, onOpenChange }: ReceiptDialogProps)
       style.id = styleId;
       document.head.appendChild(style);
     }
+    // Printing from inside the dialog overlay goes wrong on real thermal
+    // printers: the overlay is a fixed, centered, transformed element, so the
+    // print engine renders the receipt at the overlay's offset (clipped
+    // edges, blank feed before the first line). The portal copy at body level
+    // is the only thing shown while printing — a plain document that starts at
+    // the top of the page and fills the driver's reported printable width.
     style.textContent = `
       @media print {
-        body * { visibility: hidden !important; }
-        #receipt-print, #receipt-print * { visibility: visible !important; }
-        #receipt-print {
-          position: absolute; left: 50%; top: 0;
-          transform: translateX(-50%);
-          width: ${cfg.width};
-          box-shadow: none !important;
-        }
         @page { size: ${cfg.page}; margin: 0; }
       }
     `;
@@ -360,6 +366,15 @@ export function ReceiptDialog({ order, open, onOpenChange }: ReceiptDialogProps)
         <div className="flex justify-center overflow-auto rounded-md bg-muted/40 p-4">
           {vm && <ReceiptBody vm={vm} format={format} />}
         </div>
+
+        {/* Hidden duplicate for printing — see handlePrint. */}
+        {vm &&
+          createPortal(
+            <div id="receipt-print">
+              <ReceiptBody vm={vm} format={format} />
+            </div>,
+            document.body,
+          )}
 
         <DialogFooter className="no-print">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
