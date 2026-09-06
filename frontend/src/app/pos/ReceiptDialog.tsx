@@ -22,13 +22,18 @@ import {
 
 export type ReceiptFormat = "58mm" | "80mm" | "a4";
 
+// printWidth/align matter only on paper: thermal print heads cannot reach the
+// outer ~4mm of a roll, so the print copy is laid at the roll's PRINTABLE
+// width (72mm for 80mm paper, 48mm for 58mm), pinned left so the sacrificed
+// margin is never under text. A4 drivers handle their own margins, so the
+// receipt keeps its full sheet width, centered.
 export const FORMAT_CONFIG: Record<
   ReceiptFormat,
-  { width: string; page: string; font: number; padding: string }
+  { width: string; page: string; printWidth: string; align: "left" | "center"; font: number; padding: string }
 > = {
-  "58mm": { width: "58mm", page: "58mm auto", font: 11, padding: "2mm" },
-  "80mm": { width: "80mm", page: "80mm auto", font: 12, padding: "3mm" },
-  a4: { width: "210mm", page: "A4", font: 14, padding: "12mm" },
+  "58mm": { width: "58mm", page: "58mm auto", printWidth: "48mm", align: "left", font: 11, padding: "2mm" },
+  "80mm": { width: "80mm", page: "80mm auto", printWidth: "72mm", align: "left", font: 12, padding: "3mm" },
+  a4: { width: "210mm", page: "A4", printWidth: "210mm", align: "center", font: 14, padding: "12mm" },
 };
 
 function money(value: string | number | null | undefined): string {
@@ -322,8 +327,8 @@ export function ReceiptDialog({ order, open, onOpenChange }: ReceiptDialogProps)
       @page { size: ${cfg.page}; margin: 0; }
       @media print {
         #receipt-print > * {
-          width: min(100%, ${cfg.width}) !important;
-          margin-inline: auto !important;
+          width: min(100%, ${cfg.printWidth}) !important;
+          margin-inline: ${cfg.align === "center" ? "auto" : "0"} !important;
         }
       }
     `;
