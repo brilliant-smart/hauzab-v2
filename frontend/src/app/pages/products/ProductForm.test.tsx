@@ -62,6 +62,13 @@ describe("ProductForm", () => {
     expect(screen.getByText(/Opening Quantity/i)).toBeInTheDocument();
   });
 
+  it("offers Save & Finish next to the primary save button", () => {
+    renderWithProviders(<ProductForm />);
+
+    expect(screen.getByRole("button", { name: /Save & Finish/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Save Product/i })).toBeInTheDocument();
+  });
+
   it("hides the quantity field on edit but keeps Unit and Category", () => {
     useParamsMock.mockReturnValue({ id: "1" });
     vi.mocked(useProduct).mockReturnValue({

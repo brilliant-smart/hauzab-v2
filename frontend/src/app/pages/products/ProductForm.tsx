@@ -99,6 +99,11 @@ export default function ProductForm() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
+  // Which submit button was pressed: Update Product stays on the page (a ref,
+  // not state, so the value is readable in the async save callback); Save &
+  // Finish saves the same form and returns to the product list.
+  const finishAfterSave = useRef(false);
+
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -176,7 +181,7 @@ export default function ProductForm() {
       { id: id ? Number(id) : undefined, payload },
       {
         onSuccess: () => {
-          if (isEdit) {
+          if (isEdit && !finishAfterSave.current) {
             // Stay on the page after an edit so follow-up work is one visit,
             // not two: setting a base unit unlocks the Sale Units section
             // below, so the conversion (unit → pack factor → pack price)
@@ -185,7 +190,7 @@ export default function ProductForm() {
             qc.invalidateQueries({ queryKey: productKeys.detail(Number(id)) });
             return;
           }
-          toast.success("Product added");
+          toast.success(isEdit ? "Product updated" : "Product added");
           navigate("/products");
         },
         onError: (e) => handleApiError(e),
@@ -502,7 +507,16 @@ export default function ProductForm() {
             <Button type="button" variant="outline" asChild>
               <Link to="/products">Cancel</Link>
             </Button>
-            <Button type="submit" disabled={saveMutation.isPending}>
+            <Button
+              type="submit"
+              variant="outline"
+              disabled={saveMutation.isPending}
+              onClick={() => (finishAfterSave.current = true)}
+            >
+              <Save className="size-4" />
+              {saveMutation.isPending ? "Saving…" : "Save & Finish"}
+            </Button>
+            <Button type="submit" disabled={saveMutation.isPending} onClick={() => (finishAfterSave.current = false)}>
               <Save className="size-4" />
               {saveMutation.isPending ? "Saving…" : isEdit ? "Update Product" : "Save Product"}
             </Button>
