@@ -14,6 +14,7 @@ vi.mock("react-router-dom", async (importOriginal) => {
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 vi.mock("@/app/api/catalog", () => ({
+  productKeys: { all: ["products"], detail: (id: number) => ["products", id] },
   useProduct: vi.fn(() => ({ data: undefined })),
   useLookupList: vi.fn(() => ({
     data: [
@@ -26,8 +27,8 @@ vi.mock("@/app/api/catalog", () => ({
 }));
 
 // ProductForm reads the signed-in user to gate the sale-units section. A staff
-// user is below supervisor, so the section stays hidden — these tests cover the
-// catalog fields, not sale-unit config.
+// user is not a catalog manager, so the section stays hidden — these tests
+// cover the catalog fields, not sale-unit config.
 vi.mock("@/app/auth/AuthContext", () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   useAuth: () => ({ user: { id: 1, tenant_id: 1, role: "staff" }, token: "t", isAuthenticated: true, loading: false }),

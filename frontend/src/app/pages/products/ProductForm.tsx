@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Save } from "lucide-react";
 import {
+  productKeys,
   useLookupList,
   useProduct,
   useSaveProduct,
@@ -14,7 +16,7 @@ import {
 import { NamedResource, ContactResource } from "@/app/api/types";
 import { handleApiError } from "@/app/lib/errorHandler";
 import { useAuth } from "@/app/auth/AuthContext";
-import { isAtLeast } from "@/app/auth/guards";
+import { canManageProducts } from "@/app/auth/guards";
 import { PageHeader } from "@/components/PageHeader";
 import { SaleUnitsSection } from "@/app/pages/products/SaleUnitsSection";
 import { Button } from "@/components/ui/button";
@@ -83,6 +85,7 @@ export default function ProductForm() {
   const { id } = useParams();
   const isEdit = !!id;
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const { user } = useAuth();
 
   const { data: product } = useProduct(id ? Number(id) : undefined);
@@ -173,7 +176,16 @@ export default function ProductForm() {
       { id: id ? Number(id) : undefined, payload },
       {
         onSuccess: () => {
-          toast.success(isEdit ? "Product updated" : "Product added");
+          if (isEdit) {
+            // Stay on the page after an edit so follow-up work is one visit,
+            // not two: setting a base unit unlocks the Sale Units section
+            // below, so the conversion (unit → pack factor → pack price)
+            // happens without going back to the list and reopening.
+            toast.success("Product updated");
+            qc.invalidateQueries({ queryKey: productKeys.detail(Number(id)) });
+            return;
+          }
+          toast.success("Product added");
           navigate("/products");
         },
         onError: (e) => handleApiError(e),
@@ -475,9 +487,9 @@ export default function ProductForm() {
           )}
 
           {/* Sale units (carton etc.) — only once the product exists and has a
-              base unit, and only for admins/supervisors: pricing the carton is a
-              pricing decision, not a catalog-edit one. */}
-          {isEdit && product?.unit_id && isAtLeast(user, "supervisor") && (
+              base unit, and only for catalog managers: whoever converts a
+              product to base-unit stock also sets up its pack/carton options. */}
+          {isEdit && product?.unit_id && canManageProducts(user) && (
             <SaleUnitsSection
               productId={product.id}
               baseUnitId={product.unit_id}

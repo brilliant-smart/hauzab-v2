@@ -22,8 +22,8 @@ import {
  * price so the POS can ring up cartons while the ledger decrements singles.
  *
  * Rendered only for an existing product that has a base unit set, and only for
- * admins/supervisors — configuring a carton price is a pricing decision, not a
- * catalog-edit one.
+ * catalog managers (admin, supervisor, Inventory Manager) — whoever converts a
+ * product to base-unit stock also sets up its pack options.
  */
 export function SaleUnitsSection({
   productId,

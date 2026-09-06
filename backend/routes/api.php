@@ -84,10 +84,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('products/{product}', [ProductController::class, 'update']);
         Route::delete('products/{product}', [ProductController::class, 'destroy']);
 
-        // Sale-unit configuration (carton factor + price) is a pricing decision:
-        // admin and supervisor only, not the products-only Inventory Manager.
-        Route::post('products/{product}/sale-units', [SaleUnitController::class, 'store'])->middleware('role:admin|supervisor');
-        Route::delete('products/{product}/sale-units/{saleUnit}', [SaleUnitController::class, 'destroy'])->middleware('role:admin|supervisor');
+        // Sale-unit configuration goes with the catalog: whoever converts a
+        // product to base-unit stock also sets up its pack factor and price,
+        // so the Inventory Manager is included alongside admin and supervisor.
+        Route::post('products/{product}/sale-units', [SaleUnitController::class, 'store'])->middleware('role:admin|supervisor|inventory_manager');
+        Route::delete('products/{product}/sale-units/{saleUnit}', [SaleUnitController::class, 'destroy'])->middleware('role:admin|supervisor|inventory_manager');
 
         Route::apiResource('product-units', ProductUnitController::class)->except(['index']);
         Route::apiResource('product-categories', ProductCategoryController::class)->except(['index']);

@@ -182,7 +182,7 @@ class SaleUnitTest extends TestCase
         $this->assertDatabaseMissing('product_sale_units', ['product_id' => $product->id]);
     }
 
-    public function test_sale_unit_config_is_admin_or_supervisor_only(): void
+    public function test_sale_unit_config_is_limited_to_catalog_roles(): void
     {
         [$tenant, $branch, $admin, $piece, $carton] = $this->world();
         $supervisor = $this->makeUser($tenant, $branch, Role::Supervisor);
@@ -202,7 +202,11 @@ class SaleUnitTest extends TestCase
         $this->actingAsUser($supervisor)->postJson("/api/products/{$product->id}/sale-units", $payload)->assertCreated();
         $product->fresh()->saleUnits()->delete();
 
-        $this->actingAsUser($inventoryManager)->postJson("/api/products/{$product->id}/sale-units", $payload)->assertForbidden();
+        // The Inventory Manager converts products to base-unit stock, so pack
+        // configuration goes with the job; front-line staff stay read-only.
+        $this->actingAsUser($inventoryManager)->postJson("/api/products/{$product->id}/sale-units", $payload)->assertCreated();
+        $product->fresh()->saleUnits()->delete();
+
         $this->actingAsUser($staff)->postJson("/api/products/{$product->id}/sale-units", $payload)->assertForbidden();
     }
 

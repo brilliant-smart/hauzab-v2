@@ -328,15 +328,18 @@ export default function MakeSale() {
                   </Select>
                 )}
                 <div className="flex items-center gap-2">
+                  {/* Chunky stepper on purpose: cashiers key quantities in the
+                      thousands, so the field is wide enough to show the whole
+                      number and the +/- targets are easy to hit all day. */}
                   <div className="flex items-center">
                     <Button
                       variant="outline"
                       size="icon"
-                      className="size-7"
+                      className="size-9"
                       aria-label={`Decrease ${line.name} quantity`}
                       onClick={() => cart.setQty(line.productId, line.unitId, line.qty - 1)}
                     >
-                      <Minus className="size-3" />
+                      <Minus className="size-4" />
                     </Button>
                     <Input
                       type="number"
@@ -347,16 +350,16 @@ export default function MakeSale() {
                       onChange={(e) =>
                         cart.setQty(line.productId, line.unitId, Number(e.target.value) || 0)
                       }
-                      className="h-7 w-12 rounded-none border-x text-center"
+                      className="h-9 w-20 rounded-none border-x text-center text-sm font-semibold tabular-nums"
                     />
                     <Button
                       variant="outline"
                       size="icon"
-                      className="size-7"
+                      className="size-9"
                       aria-label={`Increase ${line.name} quantity`}
                       onClick={() => cart.setQty(line.productId, line.unitId, line.qty + 1)}
                     >
-                      <Plus className="size-3" />
+                      <Plus className="size-4" />
                     </Button>
                   </div>
                   <span className="text-xs text-muted-foreground">×</span>
@@ -372,9 +375,9 @@ export default function MakeSale() {
                         Math.max(priceFloor, Number(e.target.value) || 0),
                       )
                     }
-                    className="h-7 w-24"
+                    className="h-9 w-24 text-sm font-medium tabular-nums"
                   />
-                  <span className="ml-auto text-sm font-medium">
+                  <span className="ml-auto text-sm font-medium tabular-nums">
                     {formatCurrency(line.qty * line.price)}
                   </span>
                 </div>
