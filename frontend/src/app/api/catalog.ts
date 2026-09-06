@@ -95,6 +95,32 @@ export function useDeleteProduct() {
   });
 }
 
+// Retire/restore straight from the list row, without the full edit form.
+// The update endpoint requires name and both prices, so the row's current
+// values ride along unchanged — only is_active actually differs. Retiring a
+// product with sales history is the designed alternative to deleting it.
+export function useSetProductActive() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (vars: {
+      id: number;
+      active: boolean;
+      name: string;
+      cost_price: number | string;
+      selling_price: number | string;
+    }) => {
+      const { data } = await api.put<{ data: Product }>(`products/${vars.id}`, {
+        name: vars.name,
+        cost_price: vars.cost_price,
+        selling_price: vars.selling_price,
+        is_active: vars.active,
+      });
+      return data.data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: productKeys.all }),
+  });
+}
+
 export interface ProductImageUpload {
   path: string;
   url: string;

@@ -73,6 +73,7 @@ describe("ProductForm", () => {
         unit_id: 1,
         category_id: 1,
         reorder_level: 5,
+        is_active: true,
       },
     } as never);
 
@@ -82,5 +83,31 @@ describe("ProductForm", () => {
     // Unit + Category remain available for attribute edits on edit.
     expect(screen.getByText(labelIs("Unit"))).toBeInTheDocument();
     expect(screen.getByText(labelIs("Category"))).toBeInTheDocument();
+  });
+
+  it("shows the Active retire toggle on edit only", () => {
+    // Create mode: no retire switch — new products always start active.
+    const { unmount } = renderWithProviders(<ProductForm />);
+    expect(screen.queryByText(labelIs("Active"))).not.toBeInTheDocument();
+    unmount();
+
+    useParamsMock.mockReturnValue({ id: "1" });
+    vi.mocked(useProduct).mockReturnValue({
+      data: {
+        id: 1,
+        name: "Coke 60cl",
+        quantity: "12",
+        cost_price: "50",
+        selling_price: "80",
+        unit_id: 1,
+        category_id: 1,
+        reorder_level: 5,
+        is_active: true,
+      },
+    } as never);
+
+    renderWithProviders(<ProductForm />);
+
+    expect(screen.getByText(labelIs("Active"))).toBeInTheDocument();
   });
 });

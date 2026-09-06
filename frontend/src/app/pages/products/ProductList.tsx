@@ -1,11 +1,12 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { Download, Pencil, Plus, Upload } from "lucide-react";
+import { Archive, ArchiveRestore, Download, Pencil, Plus, Upload } from "lucide-react";
 import {
   downloadProductTemplate,
   useImportProducts,
   useProducts,
+  useSetProductActive,
 } from "@/app/api/catalog";
 import { Product } from "@/app/api/types";
 import { useAuth } from "@/app/auth/AuthContext";
@@ -14,22 +15,45 @@ import { handleApiError } from "@/app/lib/errorHandler";
 import { formatCurrency, formatNumber } from "@/app/lib/format";
 import { PageHeader } from "@/components/PageHeader";
 import { DataTable, Column } from "@/components/DataTable";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 
 export default function ProductList() {
   const [search, setSearch] = useState("");
+  const [showRetired, setShowRetired] = useState(false);
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
   const { data, isLoading, isFetching, isError, refetch } = useProducts({
     search,
     page,
     per_page: perPage,
+    // Active products by default; flip the toggle to also see retired ones.
+    ...(showRetired ? {} : { active_only: true }),
   });
   const importMutation = useImportProducts();
+  const setActiveMutation = useSetProductActive();
   const { user } = useAuth();
   const canManage = canManageProducts(user);
   const fileInput = useRef<HTMLInputElement>(null);
+
+  const handleSetActive = (p: Product, active: boolean) => {
+    setActiveMutation.mutate(
+      {
+        id: p.id,
+        active,
+        name: p.name,
+        cost_price: p.cost_price,
+        selling_price: p.selling_price,
+      },
+      {
+        onSuccess: () =>
+          toast.success(active ? `${p.name} restored` : `${p.name} retired`),
+        onError: (e) => handleApiError(e),
+      },
+    );
+  };
 
   const handleFile = (file: File | undefined) => {
     if (!file) return;
@@ -96,14 +120,45 @@ export default function ProductList() {
       cell: (p) => p.expire_date ?? "—",
     },
     {
+      key: "status",
+      header: "Status",
+      cell: (p) =>
+        p.is_active ? (
+          <Badge variant="secondary">Active</Badge>
+        ) : (
+          <Badge variant="outline">Retired</Badge>
+        ),
+    },
+    {
       key: "actions",
       header: "Action",
       cell: (p) => (
-        <Button asChild variant="outline" size="sm" aria-label={`Edit ${p.name}`}>
-          <Link to={`/products/${p.id}/edit`}>
-            <Pencil className="size-4" /> Edit
-          </Link>
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button asChild variant="outline" size="sm" aria-label={`Edit ${p.name}`}>
+            <Link to={`/products/${p.id}/edit`}>
+              <Pencil className="size-4" /> Edit
+            </Link>
+          </Button>
+          {canManage && (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={setActiveMutation.isPending}
+              aria-label={p.is_active ? `Retire ${p.name}` : `Restore ${p.name}`}
+              onClick={() => handleSetActive(p, !p.is_active)}
+            >
+              {p.is_active ? (
+                <>
+                  <Archive className="size-4" /> Retire
+                </>
+              ) : (
+                <>
+                  <ArchiveRestore className="size-4" /> Restore
+                </>
+              )}
+            </Button>
+          )}
+        </div>
       ),
     },
   ];
@@ -148,15 +203,30 @@ export default function ProductList() {
         }
       />
 
-      <Input
-        placeholder="Search by name, barcode or model…"
-        value={search}
-        onChange={(e) => {
-          setSearch(e.target.value);
-          setPage(1);
-        }}
-        className="max-w-sm"
-      />
+      <div className="flex flex-wrap items-center gap-4">
+        <Input
+          placeholder="Search by name, barcode or model…"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
+          className="max-w-sm"
+        />
+        <div className="flex items-center gap-2">
+          <Switch
+            id="show-retired"
+            checked={showRetired}
+            onCheckedChange={(v) => {
+              setShowRetired(v);
+              setPage(1);
+            }}
+          />
+          <label htmlFor="show-retired" className="text-sm text-muted-foreground">
+            Show retired
+          </label>
+        </div>
+      </div>
 
       <DataTable
         columns={columns}

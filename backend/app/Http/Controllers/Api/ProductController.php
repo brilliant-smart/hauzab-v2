@@ -160,6 +160,7 @@ class ProductController extends Controller
     {
         $products = Product::query()
             ->with(['category', 'unit'])
+            ->where('is_active', true)
             ->whereColumn('quantity', '<=', 'reorder_level')
             ->orderBy('name')
             ->paginate($request->integer('per_page', 25))
@@ -174,6 +175,7 @@ class ProductController extends Controller
 
         $products = Product::query()
             ->with(['category', 'unit'])
+            ->where('is_active', true)
             ->whereNotNull('expire_date')
             ->whereDate('expire_date', '<=', now()->addDays($days))
             ->orderBy('expire_date')

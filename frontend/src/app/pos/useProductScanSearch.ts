@@ -70,7 +70,7 @@ export function useProductScanSearch({
     async (code: string) => {
       try {
         const { data } = await api.get<{ data: Product[] }>("products", {
-          params: { search: code, per_page: 5 },
+          params: { search: code, per_page: 5, active_only: true },
         });
         const exact = data.data.find((p) => p.barcode === code) ?? data.data[0];
         if (!exact) {
@@ -109,7 +109,7 @@ export function useProductScanSearch({
         setIsSearching(true);
         try {
           const { data } = await api.get<{ data: Product[] }>("products", {
-            params: { search: v, per_page: perPage },
+            params: { search: v, per_page: perPage, active_only: true },
           });
           if (id !== reqIdRef.current) return; // a newer search superseded this
           setResults(data.data);

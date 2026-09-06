@@ -123,6 +123,32 @@ class CatalogTest extends TestCase
             ->assertJsonMissing(['name' => 'Long Life']);
     }
 
+    public function test_retired_products_are_excluded_from_low_stock_and_expiring(): void
+    {
+        [$tenant, $branch, $admin] = $this->admin();
+
+        Product::create([
+            'tenant_id' => $tenant->id, 'name' => 'Retired Scarce',
+            'quantity' => 0, 'cost_price' => 1, 'selling_price' => 2,
+            'reorder_level' => 1, 'is_active' => false,
+        ]);
+        Product::create([
+            'tenant_id' => $tenant->id, 'name' => 'Retired Expiring',
+            'quantity' => 5, 'cost_price' => 1, 'selling_price' => 2,
+            'expire_date' => now()->addDays(30)->toDateString(),
+            'is_active' => false,
+        ]);
+
+        $this->actingAsUser($admin)
+            ->getJson('/api/products/low-stock')
+            ->assertOk()
+            ->assertJsonMissing(['name' => 'Retired Scarce']);
+        $this->actingAsUser($admin)
+            ->getJson('/api/products/expiring')
+            ->assertOk()
+            ->assertJsonMissing(['name' => 'Retired Expiring']);
+    }
+
     public function test_a_lookup_category_can_be_created_and_is_tenant_scoped(): void
     {
         [$tenant, $branch, $admin] = $this->admin();

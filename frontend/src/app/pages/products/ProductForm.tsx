@@ -35,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 
 // Mirrors the legacy add-product form: the fields, labels, order, and
 // required markers match the blade screen staff are trained on.
@@ -53,6 +54,8 @@ const schema = z.object({
   supplier_id: z.string().optional(),
   model: z.string().optional(),
   image: z.string().optional(),
+  // Retire/restore lives on the edit screen only; create always starts active.
+  is_active: z.boolean().optional(),
 }).superRefine((data, ctx) => {
   if (data.selling_price < data.cost_price) {
     ctx.addIssue({
@@ -121,6 +124,7 @@ export default function ProductForm() {
         supplier_id: product.supplier_id ? String(product.supplier_id) : "",
         model: product.model ?? "",
         image: product.image ?? "",
+        is_active: product.is_active,
       });
       setImagePreview(product.image_url ?? null);
     }
@@ -447,6 +451,28 @@ export default function ProductForm() {
               )}
             />
           </div>
+
+          {/* Retire on the edit screen: hides the product from the POS while
+              keeping its history intact. Never a delete. */}
+          {isEdit && (
+            <FormField
+              control={form.control}
+              name="is_active"
+              render={({ field }) => (
+                <FormItem className="flex items-center gap-3 rounded-md border p-3">
+                  <FormControl>
+                    <Switch checked={!!field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                  <div>
+                    <FormLabel>Active</FormLabel>
+                    <p className="text-xs text-muted-foreground">
+                      Retire to hide this product from the POS and the list without deleting its sales history.
+                    </p>
+                  </div>
+                </FormItem>
+              )}
+            />
+          )}
 
           {/* Sale units (carton etc.) — only once the product exists and has a
               base unit, and only for admins/supervisors: pricing the carton is a
