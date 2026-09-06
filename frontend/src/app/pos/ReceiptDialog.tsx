@@ -319,8 +319,12 @@ export function ReceiptDialog({ order, open, onOpenChange }: ReceiptDialogProps)
     // is the only thing shown while printing — a plain document that starts at
     // the top of the page and fills the driver's reported printable width.
     style.textContent = `
+      @page { size: ${cfg.page}; margin: 0; }
       @media print {
-        @page { size: ${cfg.page}; margin: 0; }
+        #receipt-print > * {
+          width: min(100%, ${cfg.width}) !important;
+          margin-inline: auto !important;
+        }
       }
     `;
     // Wait for the receipt face so the printout never falls back to Courier.

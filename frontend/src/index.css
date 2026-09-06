@@ -35,10 +35,6 @@
   body.receipt-printing #receipt-print {
     display: block !important;
   }
-  body.receipt-printing #receipt-print > * {
-    width: 100% !important;
-    box-sizing: border-box;
-  }
 }
 
 /*
