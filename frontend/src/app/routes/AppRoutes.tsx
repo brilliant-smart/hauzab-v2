@@ -88,10 +88,12 @@ export default function AppRoutes() {
             </RoleProtectedRoute>
           }
         />
+        {/* Sales browsing is a manager view; cashiers see the printed receipt
+            at checkout and cannot revisit sales. */}
         <Route
           path="/pos/history"
           element={
-            <RoleProtectedRoute allowedRoles={[...SELLER_ROLES]}>
+            <RoleProtectedRoute allowedRoles={["admin", "supervisor"]}>
               <SalesHistory />
             </RoleProtectedRoute>
           }
@@ -99,7 +101,7 @@ export default function AppRoutes() {
         <Route
           path="/pos/history/:id"
           element={
-            <RoleProtectedRoute allowedRoles={[...SELLER_ROLES]}>
+            <RoleProtectedRoute allowedRoles={["admin", "supervisor"]}>
               <SaleDetail />
             </RoleProtectedRoute>
           }

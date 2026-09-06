@@ -133,7 +133,7 @@ function ReceiptBody({ vm, format }: { vm: ReceiptVM; format: ReceiptFormat }) {
       style={{
         width: cfg.width,
         padding: cfg.padding,
-        fontFamily: "ui-monospace, 'Courier New', monospace",
+        fontFamily: "'IBM Plex Mono', ui-monospace, 'Courier New', monospace",
         fontSize: cfg.font,
         background: "white",
         color: "black",
@@ -142,7 +142,7 @@ function ReceiptBody({ vm, format }: { vm: ReceiptVM; format: ReceiptFormat }) {
       }}
     >
       <div style={{ textAlign: "center" }}>
-        <div style={{ fontWeight: 800, fontSize: cfg.font + 6 }}>
+        <div style={{ fontWeight: 600, fontSize: cfg.font + 6, letterSpacing: "0.02em" }}>
           {tenant?.name ?? "Hauzab"}
         </div>
         {tenant?.address && (
@@ -183,8 +183,8 @@ function ReceiptBody({ vm, format }: { vm: ReceiptVM; format: ReceiptFormat }) {
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
           <tr style={{ textAlign: "left" }}>
-            <th style={{ fontWeight: 700 }}>Item</th>
-            <th style={{ fontWeight: 700, textAlign: "right" }}>Total</th>
+            <th style={{ fontWeight: 600 }}>Item</th>
+            <th style={{ fontWeight: 600, textAlign: "right" }}>Total</th>
           </tr>
         </thead>
         <tbody>
@@ -218,7 +218,7 @@ function ReceiptBody({ vm, format }: { vm: ReceiptVM; format: ReceiptFormat }) {
         style={{
           display: "flex",
           justifyContent: "space-between",
-          fontWeight: 700,
+          fontWeight: 600,
           fontSize: cfg.font + 1,
           borderTop: "1px solid #000",
           marginTop: 2,
@@ -266,7 +266,7 @@ function ReceiptBody({ vm, format }: { vm: ReceiptVM; format: ReceiptFormat }) {
         <div
           style={{
             textAlign: "center",
-            fontWeight: 700,
+            fontWeight: 600,
             border: "1px dashed #000",
             padding: "2px 0",
           }}
@@ -274,7 +274,7 @@ function ReceiptBody({ vm, format }: { vm: ReceiptVM; format: ReceiptFormat }) {
           PENDING SYNC
         </div>
       ) : (
-        <div style={{ textAlign: "center", fontWeight: 700 }}>
+        <div style={{ textAlign: "center", fontWeight: 600 }}>
           {vm.statusLabel.toUpperCase()}
         </div>
       )}
@@ -309,13 +309,21 @@ export function ReceiptDialog({ order, open, onOpenChange }: ReceiptDialogProps)
         body * { visibility: hidden !important; }
         #receipt-print, #receipt-print * { visibility: visible !important; }
         #receipt-print {
-          position: absolute; left: 0; top: 0; width: ${cfg.width};
+          position: absolute; left: 50%; top: 0;
+          transform: translateX(-50%);
+          width: ${cfg.width};
           box-shadow: none !important;
         }
         @page { size: ${cfg.page}; margin: 0; }
       }
     `;
-    window.print();
+    // Wait for the receipt face so the printout never falls back to Courier.
+    const printNow = () => window.print();
+    if (document.fonts?.ready) {
+      document.fonts.ready.then(printNow);
+    } else {
+      printNow();
+    }
   };
 
   return (

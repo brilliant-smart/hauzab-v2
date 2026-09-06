@@ -66,10 +66,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Register and customers — cashiers and managers ring up sales. Inventory
     // Manager is a products-only role (rank 0), excluded from this allow-list so
-    // it cannot sell or browse sales/customers.
-    Route::get('orders', [OrderController::class, 'index'])->middleware('role:admin|supervisor|staff');
+    // it cannot sell or browse sales/customers. Cashiers can checkout (POST)
+    // but not browse history — the printed receipt is their sale summary.
+    Route::get('orders', [OrderController::class, 'index'])->middleware('role:admin|supervisor');
     Route::post('orders', [OrderController::class, 'store'])->middleware('role:admin|supervisor|staff');
-    Route::get('orders/{order}', [OrderController::class, 'show'])->middleware('role:admin|supervisor|staff');
+    Route::get('orders/{order}', [OrderController::class, 'show'])->middleware('role:admin|supervisor');
     Route::apiResource('customers', CustomerController::class)->middleware('role:admin|supervisor|staff');
 
     // Product catalog management — admins, supervisors, and the products-only

@@ -2,6 +2,10 @@
 @import "@fontsource/dm-sans/500.css";
 @import "@fontsource/dm-sans/600.css";
 @import "@fontsource/dm-sans/700.css";
+/* Receipt typeface: clean tabular digits and crisp small-size legibility for
+   thermal rolls and A4 alike. Only 400/600 are loaded — receipts need no more. */
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/600.css";
 
 @tailwind base;
 @tailwind components;

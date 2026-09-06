@@ -96,37 +96,39 @@ class OrderTest extends TestCase
         $this->assertSame(1, Order::where('uuid', $uuid)->count());
     }
 
-    public function test_staff_only_see_their_own_sales(): void
+    public function test_staff_can_checkout_but_cannot_browse_sales_history(): void
     {
         [$tenant, $branch] = $this->makeTenant('Store');
-        $staffA = $this->makeUser($tenant, $branch, Role::Staff);
-        $staffB = $this->makeUser($tenant, $branch, Role::Staff);
+        $staff = $this->makeUser($tenant, $branch, Role::Staff);
+        $supervisor = $this->makeUser($tenant, $branch, Role::Supervisor);
         $product = Product::create([
             'tenant_id' => $tenant->id, 'name' => 'Soda',
             'quantity' => 10, 'cost_price' => 50, 'selling_price' => 100,
         ]);
 
-        $this->actingAsUser($staffA)->postJson('/api/orders', $this->checkoutPayload($product, '55555555-5555-4555-8555-555555555555'))->assertCreated();
-        $this->actingAsUser($staffB)->postJson('/api/orders', $this->checkoutPayload($product, '66666666-6666-4666-8666-666666666666'))->assertCreated();
+        // Checkout works for the cashier; the printed receipt is their summary.
+        $this->actingAsUser($staff)->postJson('/api/orders', $this->checkoutPayload($product, '55555555-5555-4555-8555-555555555555'))->assertCreated();
+        $order = Order::where('uuid', '55555555-5555-4555-8555-555555555555')->first();
 
-        $this->actingAsUser($staffA)
-            ->getJson('/api/orders')
+        // But revisiting sales is a manager view.
+        $this->actingAsUser($staff)->getJson('/api/orders')->assertForbidden();
+        $this->actingAsUser($staff)->getJson("/api/orders/{$order->id}")->assertForbidden();
+        $this->actingAsUser($supervisor)->getJson('/api/orders')
             ->assertOk()
-            ->assertJsonPath('data.0.uuid', '55555555-5555-4555-8555-555555555555')
-            ->assertJsonMissing(['uuid' => '66666666-6666-4666-8666-666666666666']);
+            ->assertJsonPath('data.0.uuid', '55555555-5555-4555-8555-555555555555');
     }
 
     public function test_the_index_filters_by_from_to_date_range(): void
     {
         [$tenant, $branch] = $this->makeTenant('Store');
-        $cashier = $this->makeUser($tenant, $branch, Role::Staff);
+        $supervisor = $this->makeUser($tenant, $branch, Role::Supervisor);
         $product = Product::create([
             'tenant_id' => $tenant->id, 'name' => 'Soda',
             'quantity' => 10, 'cost_price' => 50, 'selling_price' => 100,
         ]);
 
-        $this->actingAsUser($cashier)->postJson('/api/orders', $this->checkoutPayload($product, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'))->assertCreated();
-        $this->actingAsUser($cashier)->postJson('/api/orders', $this->checkoutPayload($product, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'))->assertCreated();
+        $this->actingAsUser($supervisor)->postJson('/api/orders', $this->checkoutPayload($product, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'))->assertCreated();
+        $this->actingAsUser($supervisor)->postJson('/api/orders', $this->checkoutPayload($product, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'))->assertCreated();
 
         // Backdate the first sale so a "today" range should exclude it.
         DB::table('orders')->where('uuid', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')
@@ -135,13 +137,13 @@ class OrderTest extends TestCase
         $today = now()->toDateString();
         $tenDaysAgo = now()->subDays(10)->toDateString();
 
-        $this->actingAsUser($cashier)
+        $this->actingAsUser($supervisor)
             ->getJson('/api/orders?from='.$today.'&to='.$today)
             ->assertOk()
             ->assertJsonPath('data.0.uuid', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb')
             ->assertJsonMissing(['uuid' => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa']);
 
-        $this->actingAsUser($cashier)
+        $this->actingAsUser($supervisor)
             ->getJson('/api/orders?from='.$tenDaysAgo.'&to='.$today)
             ->assertOk()
             ->assertJsonCount(2, 'data');
