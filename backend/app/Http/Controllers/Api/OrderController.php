@@ -36,7 +36,10 @@ class OrderController extends Controller
                 $term = $request->string('search');
                 $q->where(fn ($inner) => $inner
                     ->where('number', 'like', "%{$term}%")
-                    ->orWhere('customer_name', 'like', "%{$term}%"));
+                    ->orWhere('customer_name', 'like', "%{$term}%")
+                    // Match any line's product so a receipt can be found by
+                    // what was sold, not just its number or customer.
+                    ->orWhereHas('items', fn ($iq) => $iq->where('product_name', 'like', "%{$term}%")));
             })
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->string('status')))
             // Optional date-range filter (legacy sales history defaults to

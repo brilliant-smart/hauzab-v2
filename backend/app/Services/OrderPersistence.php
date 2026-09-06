@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Enums\OrderStatus;
+use App\Enums\Role;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
@@ -130,6 +132,14 @@ class OrderPersistence
             }
 
             $discount = (string) ($data['discount'] ?? 0);
+            // Cashiers ring full price: a discount is a manager action, so a
+            // below-supervisor seller (POS or cloud sync) is rejected here.
+            if (bccomp($discount, '0') > 0 && $userId) {
+                $seller = User::find($userId);
+                if ($seller && ! $seller->isAtLeast(Role::Supervisor)) {
+                    abort(422, 'Cashiers cannot apply a discount.');
+                }
+            }
             $total = bcsub($subtotal, $discount, 4);
             if (bccomp($total, '0') < 0) {
                 abort(422, 'Discount cannot exceed the subtotal.');

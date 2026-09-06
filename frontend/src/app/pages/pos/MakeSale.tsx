@@ -22,6 +22,7 @@ import { ReceiptDialog } from "@/app/pos/ReceiptDialog";
 import { useOutbox } from "@/app/offline/useOutbox";
 import { device } from "@/app/offline/device";
 import { useAuth } from "@/app/auth/AuthContext";
+import { isAtLeast } from "@/app/auth/guards";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,6 +61,8 @@ function newUuid(): string {
 
 export default function MakeSale() {
   const { user } = useAuth();
+  // Only supervisors and above can discount a sale; cashiers ring full price.
+  const canDiscount = isAtLeast(user, "supervisor");
   const [customerId, setCustomerId] = useState<string>("");
   const [discount, setDiscount] = useState(0);
   const [paymentOpen, setPaymentOpen] = useState(false);
@@ -329,17 +332,18 @@ export default function MakeSale() {
                 )}
                 <div className="flex items-center gap-2">
                   {/* Chunky stepper on purpose: cashiers key quantities in the
-                      thousands, so the field is wide enough to show the whole
-                      number and the +/- targets are easy to hit all day. */}
-                  <div className="flex items-center">
+                      hundreds of thousands all day, so the field shows the
+                      whole number at a glance and the +/- targets meet the
+                      44px touch standard. */}
+                  <div className="flex items-center rounded-md border bg-card p-1">
                     <Button
                       variant="outline"
                       size="icon"
-                      className="size-9"
+                      className="size-11 rounded-md border-0 shadow-none"
                       aria-label={`Decrease ${line.name} quantity`}
                       onClick={() => cart.setQty(line.productId, line.unitId, line.qty - 1)}
                     >
-                      <Minus className="size-4" />
+                      <Minus className="size-5" />
                     </Button>
                     <Input
                       type="number"
@@ -350,16 +354,16 @@ export default function MakeSale() {
                       onChange={(e) =>
                         cart.setQty(line.productId, line.unitId, Number(e.target.value) || 0)
                       }
-                      className="h-9 w-20 rounded-none border-x text-center text-sm font-semibold tabular-nums"
+                      className="h-11 w-28 rounded-md border-0 bg-transparent text-center text-lg font-semibold tabular-nums focus-visible:ring-0"
                     />
                     <Button
                       variant="outline"
                       size="icon"
-                      className="size-9"
+                      className="size-11 rounded-md border-0 shadow-none"
                       aria-label={`Increase ${line.name} quantity`}
                       onClick={() => cart.setQty(line.productId, line.unitId, line.qty + 1)}
                     >
-                      <Plus className="size-4" />
+                      <Plus className="size-5" />
                     </Button>
                   </div>
                   <span className="text-xs text-muted-foreground">×</span>
@@ -375,7 +379,7 @@ export default function MakeSale() {
                         Math.max(priceFloor, Number(e.target.value) || 0),
                       )
                     }
-                    className="h-9 w-24 text-sm font-medium tabular-nums"
+                    className="h-11 w-24 text-sm font-medium tabular-nums"
                   />
                   <span className="ml-auto text-sm font-medium tabular-nums">
                     {formatCurrency(line.qty * line.price)}
@@ -393,18 +397,20 @@ export default function MakeSale() {
               <span>Subtotal</span>
               <span>{formatCurrency(cart.subtotal)}</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Discount</span>
-              <Input
-                type="number"
-                min={0}
-                step="0.01"
-                value={discount || ""}
-                onChange={(e) => setDiscount(Math.max(0, Number(e.target.value) || 0))}
-                className="h-8 w-28 text-right"
-                placeholder="0.00"
-              />
-            </div>
+            {canDiscount && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Discount</span>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={discount || ""}
+                  onChange={(e) => setDiscount(Math.max(0, Number(e.target.value) || 0))}
+                  className="h-8 w-28 text-right"
+                  placeholder="0.00"
+                />
+              </div>
+            )}
             <div className="flex justify-between text-base font-semibold">
               <span>Total</span>
               <span>{formatCurrency(total)}</span>

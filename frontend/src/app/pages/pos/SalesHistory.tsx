@@ -261,7 +261,7 @@ export default function SalesHistory() {
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Search</label>
               <Input
-                placeholder="Order # or customer…"
+                placeholder="Order #, product, or customer…"
                 value={search}
                 onChange={(e) => {
                   setSearch(e.target.value);

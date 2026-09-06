@@ -147,6 +147,54 @@ class OrderTest extends TestCase
             ->assertJsonCount(2, 'data');
     }
 
+    public function test_the_index_search_matches_product_names(): void
+    {
+        [$tenant, $branch] = $this->makeTenant('Store');
+        $supervisor = $this->makeUser($tenant, $branch, Role::Supervisor);
+        $soda = Product::create([
+            'tenant_id' => $tenant->id, 'name' => 'Soda',
+            'quantity' => 10, 'cost_price' => 50, 'selling_price' => 100,
+        ]);
+        $milk = Product::create([
+            'tenant_id' => $tenant->id, 'name' => 'Peak Milk Powder',
+            'quantity' => 10, 'cost_price' => 50, 'selling_price' => 100,
+        ]);
+
+        $this->actingAsUser($supervisor)->postJson('/api/orders', $this->checkoutPayload($soda, 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'))->assertCreated();
+        $this->actingAsUser($supervisor)->postJson('/api/orders', $this->checkoutPayload($milk, 'dddddddd-dddd-4ddd-8ddd-dddddddddddd'))->assertCreated();
+
+        // A receipt can be found by what was sold, not just by its number.
+        $this->actingAsUser($supervisor)
+            ->getJson('/api/orders?search=Peak')
+            ->assertOk()
+            ->assertJsonPath('data.0.uuid', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd')
+            ->assertJsonMissing(['uuid' => 'cccccccc-cccc-4ccc-8ccc-cccccccccccc']);
+
+        $this->actingAsUser($supervisor)
+            ->getJson('/api/orders?search=Nothing+Matches')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+    }
+
+    public function test_a_cashier_cannot_discount_a_sale(): void
+    {
+        [$tenant, $branch] = $this->makeTenant('Store');
+        $cashier = $this->makeUser($tenant, $branch, Role::Staff);
+        $supervisor = $this->makeUser($tenant, $branch, Role::Supervisor);
+        $product = Product::create([
+            'tenant_id' => $tenant->id, 'name' => 'Soda',
+            'quantity' => 10, 'cost_price' => 50, 'selling_price' => 100,
+        ]);
+
+        $payload = $this->checkoutPayload($product, 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 2, 100, 150);
+        $payload['discount'] = 50;
+
+        $this->actingAsUser($cashier)->postJson('/api/orders', $payload)
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Cashiers cannot apply a discount.');
+        $this->actingAsUser($supervisor)->postJson('/api/orders', $payload)->assertCreated();
+    }
+
     public function test_a_new_sale_queues_the_cloud_push_and_audit_event(): void
     {
         [$tenant, $branch] = $this->makeTenant('Store');

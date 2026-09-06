@@ -87,7 +87,9 @@ const STOCK_CHILDREN: NavLeaf[] = [
 ];
 
 const REPORTS_CHILDREN: NavLeaf[] = [
-  { to: "/reports/sales", label: "Sales Report" },
+  { to: "/reports/sales", label: "Sales Report", roles: ["admin", "supervisor"] },
+  // Cashiers reach Sales History to recheck and reprint their own sales;
+  // voiding stays supervisor-and-above on both the page and the API.
   { to: "/pos/history", label: "Sales History" },
   { to: "/reports/sales-audit", label: "Sales Audit", roles: ["admin"] },
   { to: "/reports/staff-sales", label: "Staff Sales", roles: ["admin"] },
@@ -103,7 +105,7 @@ const PRIMARY_NAV: NavItem[] = [
   { to: "/pos", label: "Make Sale", icon: ShoppingCart, end: true, roles: ["admin", "supervisor", "staff"] },
   { label: "Products", icon: Boxes, children: PRODUCTS_CHILDREN, roles: ["admin", "supervisor", "inventory_manager"] },
   { label: "Stock", icon: ClipboardList, children: STOCK_CHILDREN, roles: ["admin", "supervisor", "inventory_manager"] },
-  { label: "Reports", icon: BarChart3, children: REPORTS_CHILDREN, managerOnly: true },
+  { label: "Reports", icon: BarChart3, children: REPORTS_CHILDREN, roles: ["admin", "supervisor", "staff"] },
   { label: "Expenses", icon: Wallet, children: EXPENSE_CHILDREN, managerOnly: true },
   { to: "/employees", label: "Employee Records", icon: Users, managerOnly: true, roles: ["admin"] },
   { to: "/customers", label: "Customers", icon: Contact, managerOnly: true },
