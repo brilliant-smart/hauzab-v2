@@ -204,8 +204,10 @@ class ProductController extends Controller
 
     /**
      * Bulk-import products from an .xlsx spreadsheet. Reads by header name
-     * (not positionally), dedupes by barcode within the tenant, opens each
-     * product's stock card, and writes a consignment row per imported line.
+     * (not positionally), matches existing products by barcode then by name
+     * within the tenant (a restock sheet usually leaves barcodes blank),
+     * opens each new product's stock card, and books each line's stock in
+     * as a "received" movement.
      */
     public function import(Request $request): JsonResponse
     {
@@ -310,6 +312,14 @@ class ProductController extends Controller
                         ? Product::where('tenant_id', $tenantId)->where('barcode', $barcode)->first()
                         : null;
 
+                    // A restock sheet names products that already exist — the
+                    // barcode column is usually left blank — so fall back to a
+                    // name match (the same case/space-insensitive rule the
+                    // duplicate-name guard enforces) and restock that product.
+                    $existing ??= Product::where('tenant_id', $tenantId)
+                        ->where('name', $rowData['name'])
+                        ->first();
+
                     if ($existing) {
                         $delta = (string) $rowData['quantity'];
 
@@ -323,6 +333,11 @@ class ProductController extends Controller
                         }
 
                         $existing->update([
+                            // A name-matched product picks up its barcode from
+                            // the sheet, so future imports find it directly.
+                            'barcode' => $barcode !== null && ($existing->barcode === null || $existing->barcode === '')
+                                ? $barcode
+                                : $existing->barcode,
                             'cost_price' => $rowData['cost_price'] !== '0' ? $rowData['cost_price'] : $existing->cost_price,
                             'selling_price' => $rowData['selling_price'] !== '0' ? $rowData['selling_price'] : $existing->selling_price,
                             'size' => $rowData['size'] ?? $existing->size,
@@ -338,10 +353,9 @@ class ProductController extends Controller
 
                         $updated++;
                     } else {
-                        // An import row is also a duplicate source: a row whose
-                        // name already exists (matched case/space-insensitively
-                        // by the DB collation) must never create a second
-                        // product with that name.
+                        // The name lookup above matched nothing, but a concurrent
+                        // import could still have created the name in between:
+                        // never create a second product with it.
                         if (Product::where('tenant_id', $tenantId)->where('name', $rowData['name'])->exists()) {
                             $skipped++;
                             $errors[] = "Row {$rowNo} ({$name}): a product with this name already exists";

@@ -13,10 +13,10 @@ use Tests\TenancyHelpers;
 use Tests\TestCase;
 
 /**
- * Bulk product import reads an .xlsx by header name, dedupes by barcode within
- * the tenant, opens a stock card per product, and books each line's stock in
- * as a "received" stock movement. Invalid rows are skipped and reported in
- * {errors}.
+ * Bulk product import reads an .xlsx by header name, matches existing products
+ * by barcode then by name within the tenant, opens a stock card per new
+ * product, and books each line's stock in as a "received" stock movement.
+ * Invalid rows are skipped and reported in {errors}.
  */
 class ImportProductsTest extends TestCase
 {
@@ -150,5 +150,68 @@ class ImportProductsTest extends TestCase
         $this->assertSame('Aisle 3', $product->department);
         $this->assertSame(10, (int) $product->reorder_level);
         $this->assertSame('2027-01-31', $product->expire_date->format('Y-m-d'));
+    }
+
+    // A bulk-purchase sheet restocks products that already exist and leaves
+    // the barcode column blank — the exact shape the store's restock imports
+    // come in. The row must restock the named product, never error out.
+    public function test_a_restock_row_matches_an_existing_product_by_name(): void
+    {
+        [$tenant, $branch, $admin] = $this->admin();
+
+        $this->actingAsUser($admin)->postJson('/api/products', [
+            'name' => 'Viva 1.7 Kg', 'quantity' => 4, 'cost_price' => 3875, 'selling_price' => 4300,
+        ])->assertCreated();
+        $product = Product::where('name', 'Viva 1.7 Kg')->first();
+
+        $upload = $this->buildUpload([
+            ['BAR CODE NUMBER', 'PRODUCTS NAME', 'PRODUCT SIZES', 'PRODUCT QTY', 'PURCHASE PRICE', 'SELLING PRICE', 'PRODUCT DEPARTMENT', 'ORDER LEVEL', 'PRODUC EXPIRED DATE'],
+            ['', 'VIVA 1.7 KG', 'PSC', 16, 3875, 4300, 'GENERAL', 2, ''],
+        ]);
+
+        $this->actingAsUser($admin)
+            ->postJson('/api/products/import', ['file' => $upload])
+            ->assertOk()
+            ->assertJsonPath('imported', 0)
+            ->assertJsonPath('updated', 1)
+            ->assertJsonPath('skipped', 0)
+            ->assertJsonCount(0, 'errors');
+
+        $product = $product->fresh();
+        $this->assertSame('20.0000', (string) $product->quantity); // 4 + 16 received
+        $this->assertSame('4300.0000', (string) $product->selling_price);
+
+        // The restock is an audited received movement, reason "purchase".
+        $movement = StockMovement::where('product_id', $product->id)
+            ->where('type', 'received')->orderByDesc('id')->first();
+        $this->assertSame('16.0000', (string) $movement->delta);
+        $this->assertSame('purchase', $movement->reason);
+    }
+
+    // When the sheet does carry a barcode for an existing (barcode-less)
+    // product, the name match fills it in so later imports match directly.
+    public function test_a_name_matched_product_picks_up_its_barcode(): void
+    {
+        [$tenant, $branch, $admin] = $this->admin();
+
+        $this->actingAsUser($admin)->postJson('/api/products', [
+            'name' => 'Viva 330G', 'quantity' => 0, 'cost_price' => 808, 'selling_price' => 900,
+        ])->assertCreated();
+        $product = Product::where('name', 'Viva 330G')->first();
+        $this->assertNull($product->barcode);
+
+        $upload = $this->buildUpload([
+            ['BAR CODE NUMBER', 'PRODUCTS NAME', 'PRODUCT QTY', 'PURCHASE PRICE', 'SELLING PRICE'],
+            ['8801234567890', 'VIVA 330G', 52, 808, 900],
+        ]);
+
+        $this->actingAsUser($admin)
+            ->postJson('/api/products/import', ['file' => $upload])
+            ->assertOk()
+            ->assertJsonPath('updated', 1)
+            ->assertJsonPath('skipped', 0);
+
+        $this->assertSame('8801234567890', $product->fresh()->barcode);
+        $this->assertSame('52.0000', (string) $product->fresh()->quantity);
     }
 }
