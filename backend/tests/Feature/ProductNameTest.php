@@ -103,6 +103,53 @@ class ProductNameTest extends TestCase
         $this->assertSame('Pepsi 50cl', $product->fresh()->name);
     }
 
+    // The legacy duplicate pairs share a name, so every edit of either one
+    // used to die on "The name has already been taken" — including the
+    // retire that resolves the pair. An unchanged name must not trip the
+    // rule; only a rename onto a taken name does.
+    public function test_a_legacy_duplicate_can_still_be_edited_and_retired(): void
+    {
+        [$tenant, , $admin] = $this->admin();
+
+        // Two products sharing a name, exactly like the inherited pairs.
+        $kept = Product::create([
+            'tenant_id' => $tenant->id, 'name' => 'Legacy Dolo',
+            'quantity' => 10, 'cost_price' => 50, 'selling_price' => 100,
+        ]);
+        $redundant = Product::create([
+            'tenant_id' => $tenant->id, 'name' => 'Legacy Dolo',
+            'quantity' => 3, 'cost_price' => 50, 'selling_price' => 100,
+        ]);
+
+        // Retire the redundant row — the save must go through.
+        $this->actingAsUser($admin)
+            ->putJson("/api/products/{$redundant->id}", [
+                'name' => 'Legacy Dolo',
+                'cost_price' => 50,
+                'selling_price' => 100,
+                'is_active' => false,
+            ])
+            ->assertOk();
+
+        $this->assertFalse($redundant->fresh()->is_active);
+        $this->assertTrue($kept->fresh()->is_active);
+
+        // Renaming it onto the sibling's name is still blocked: the rule
+        // applies whenever the name changes.
+        $other = Product::create([
+            'tenant_id' => $tenant->id, 'name' => 'Other Product',
+            'quantity' => 5, 'cost_price' => 40, 'selling_price' => 70,
+        ]);
+        $this->actingAsUser($admin)
+            ->putJson("/api/products/{$other->id}", [
+                'name' => 'Legacy Dolo',
+                'cost_price' => 40,
+                'selling_price' => 70,
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('name');
+    }
+
     public function test_searching_with_stray_spaces_still_matches(): void
     {
         [, , $admin] = $this->admin();

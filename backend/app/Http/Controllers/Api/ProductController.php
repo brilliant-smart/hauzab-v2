@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Concerns\StreamsExports;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ProductResource;
 use App\Models\AuditLog;
@@ -26,6 +27,8 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class ProductController extends Controller
 {
+    use StreamsExports;
+
     public function __construct(
         private readonly StockLedger $ledger,
         private readonly StockMovementService $movements,
@@ -167,6 +170,45 @@ class ProductController extends Controller
             ->withQueryString();
 
         return ProductResource::collection($products)->response();
+    }
+
+    /** Low-stock Excel export — the Product Reminder list (admin only). */
+    public function lowStockExport()
+    {
+        $this->prepareExport();
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $headers = ['Name', 'Size', 'Quantity', 'Cost Price', 'Selling Price', 'Order Level', 'Manufactured Date', 'Expire Date'];
+        $sheet->fromArray([$headers], null, 'A1');
+
+        $row = 2;
+        $widths = array_map('strlen', $headers);
+        Product::query()
+            ->where('is_active', true)
+            ->whereColumn('quantity', '<=', 'reorder_level')
+            ->orderBy('name')
+            ->chunkById(1000, function ($products) use ($sheet, &$row, &$widths) {
+                foreach ($products as $p) {
+                    $cells = [
+                        $p->name,
+                        $p->size,
+                        (float) $p->quantity,
+                        (float) $p->cost_price,
+                        (float) $p->selling_price,
+                        (int) $p->reorder_level,
+                        optional($p->manufacture_date)->toDateString(),
+                        optional($p->expire_date)->toDateString(),
+                    ];
+                    $this->trackWidths($widths, $cells);
+                    $sheet->fromArray([$cells], null, "A{$row}");
+                    $row++;
+                }
+            });
+
+        $this->styleSheet($sheet, $headers, [4, 5], $widths); // Cost Price, Selling Price
+
+        return $this->streamSpreadsheet($spreadsheet, $this->exportName('low-stock', null, null));
     }
 
     public function expiring(Request $request)
@@ -510,14 +552,18 @@ class ProductController extends Controller
             $request->merge(['name' => static::normalizedName($request->input('name'))]);
         }
 
+        // The uniqueness rule applies to a NEW name — a create, or an edit that
+        // changes the name (closing the rename loophole). An unchanged name
+        // skips it: the legacy duplicate pairs share a name, and "The name has
+        // already been taken" must never block editing or retiring one of
+        // them — retiring the redundant row is the consolidation path itself.
+        $nameRule = ['required', 'string', 'max:191'];
+        if ($creating || $request->input('name') !== $product->name) {
+            $nameRule[] = Rule::unique('products')->where('tenant_id', $tenantId)->ignore($product?->id);
+        }
+
         $data = $request->validate([
-            // Name uniqueness within the tenant on both create and edit: create
-            // blocks new duplicates at the root cause, edit closes the rename
-            // loophole (renaming a product to a name another already has is the
-            // other way duplicates appear). The legacy duplicates are resolved by
-            // renaming survivors to fresh harmonized names and retiring the
-            // redundant rows, so this never blocks that consolidation.
-            'name' => ['required', 'string', 'max:191', Rule::unique('products')->where('tenant_id', $tenantId)->ignore($product?->id)],
+            'name' => $nameRule,
             'description' => ['nullable', 'string'],
             'size' => ['nullable', 'string', 'max:120'],
             'model' => ['nullable', 'string', 'max:120'],
