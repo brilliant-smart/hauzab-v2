@@ -13,6 +13,7 @@ import { DataTable, Column } from "@/components/DataTable";
 import { DateRangeFilter } from "@/components/DateRangeFilter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableCell, TableRow } from "@/components/ui/table";
 
@@ -28,6 +29,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 export default function SalesReport() {
   const [from, setFrom] = useState(today());
   const [to, setTo] = useState(today());
+  const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [exporting, setExporting] = useState(false);
   const { user } = useAuth();
@@ -36,6 +38,7 @@ export default function SalesReport() {
   const params: Record<string, unknown> = { page, per_page: 25 };
   if (from) params.from = from;
   if (to) params.to = to;
+  if (search) params.search = search;
 
   const { data, isLoading, isFetching, isError, refetch } = useSalesReport(params);
   const sumsLoading = isLoading || isFetching;
@@ -50,7 +53,10 @@ export default function SalesReport() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      await downloadSalesReportExport({ from, to });
+      // The export carries the same window and search as the list on screen.
+      const filters: Record<string, unknown> = { from, to };
+      if (search) filters.search = search;
+      await downloadSalesReportExport(filters);
       toast.success("Export ready");
     } catch (err) {
       handleApiError(err, "Export failed");
@@ -107,7 +113,26 @@ export default function SalesReport() {
         }
       />
 
-      <DateRangeFilter from={from} to={to} onApply={applyRange} />
+      {/* Filter bar — date range plus a search over order #, product, or customer. */}
+      <DateRangeFilter
+        from={from}
+        to={to}
+        onApply={applyRange}
+        actions={
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Search</label>
+            <Input
+              placeholder="Order #, product, or customer…"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              className="w-56"
+            />
+          </div>
+        }
+      />
 
       <DataTable
         columns={columns}

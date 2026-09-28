@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\Role;
 use App\Models\Product;
+use Illuminate\Support\Arr;
 use Tests\TenancyHelpers;
 use Tests\TestCase;
 
@@ -99,6 +100,36 @@ class CatalogTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.0.name', 'Scarce')
             ->assertJsonMissing(['name' => 'Plenty']);
+    }
+
+    // The low-stock Excel export is admin only, per the exports rule — same
+    // gating as the audit-trail and report exports.
+    public function test_low_stock_export_returns_an_xlsx_for_admins_only(): void
+    {
+        [$tenant, $branch, $admin] = $this->admin();
+        $supervisor = $this->makeUser($tenant, $branch, Role::Supervisor);
+
+        Product::create([
+            'tenant_id' => $tenant->id, 'name' => 'Scarce',
+            'quantity' => 0, 'cost_price' => 1, 'selling_price' => 2, 'reorder_level' => 1,
+        ]);
+
+        $response = $this->actingAsUser($admin)
+            ->getJson('/api/products/low-stock/export')
+            ->assertOk()
+            ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+        $rows = $this->readExportRows($response);
+        $this->assertSame(
+            ['Name', 'Size', 'Quantity', 'Cost Price', 'Selling Price', 'Order Level', 'Manufactured Date', 'Expire Date'],
+            $rows[0],
+        );
+        $this->assertSame('Scarce', Arr::get($rows, '1.0'));
+
+        // Supervisors may view the list but not export it.
+        $this->actingAsUser($supervisor)
+            ->getJson('/api/products/low-stock/export')
+            ->assertForbidden();
     }
 
     public function test_expiring_lists_products_within_the_window(): void

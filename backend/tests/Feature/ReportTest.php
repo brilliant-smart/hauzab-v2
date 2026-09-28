@@ -8,7 +8,6 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductCard;
 use Illuminate\Support\Arr;
-use PhpOffice\PhpSpreadsheet\Reader\Xlsx as XlsxReader;
 use Tests\TenancyHelpers;
 use Tests\TestCase;
 
@@ -52,6 +51,54 @@ class ReportTest extends TestCase
             ->assertJsonPath('sums.count', 2)
             ->assertJsonPath('sums.total', '300.0000')
             ->assertJsonPath('sums.amount_paid', '250.0000');
+    }
+
+    public function test_the_sales_report_search_matches_numbers_products_and_customers(): void
+    {
+        [$tenant, $branch] = $this->makeTenant('Store');
+        $admin = $this->makeUser($tenant, $branch, Role::Admin);
+        $cashier = $this->makeUser($tenant, $branch, Role::Staff);
+
+        $product = Product::create([
+            'tenant_id' => $tenant->id, 'name' => 'Peak Milk Powder',
+            'quantity' => 10, 'cost_price' => 50, 'selling_price' => 100,
+        ]);
+
+        $this->makeOrder($tenant->id, $cashier->id, 'INV-000050', OrderStatus::Completed->value, '200', '200');
+        $byProduct = $this->makeOrder($tenant->id, $cashier->id, 'INV-000051', OrderStatus::Completed->value, '500', '500');
+        $byProduct->items()->create([
+            'product_id' => $product->id, 'product_name' => 'Peak Milk Powder',
+            'quantity' => 5, 'unit_price' => 100, 'line_total' => 500,
+        ]);
+        $byCustomer = $this->makeOrder($tenant->id, $cashier->id, 'INV-000052', OrderStatus::Completed->value, '80', '80');
+        $byCustomer->update(['customer_name' => 'Adaeze']);
+
+        // By product: only the sale that carried the item.
+        $this->actingAsUser($admin)
+            ->getJson('/api/reports/sales?search='.rawurlencode('Peak Milk'))
+            ->assertOk()
+            ->assertJsonPath('sums.count', 1)
+            ->assertJsonPath('data.0.number', $byProduct->number);
+
+        // By customer name.
+        $this->actingAsUser($admin)
+            ->getJson('/api/reports/sales?search=Adaeze')
+            ->assertOk()
+            ->assertJsonPath('sums.count', 1)
+            ->assertJsonPath('data.0.number', $byCustomer->number);
+
+        // By order number.
+        $this->actingAsUser($admin)
+            ->getJson('/api/reports/sales?search=INV-000050')
+            ->assertOk()
+            ->assertJsonPath('sums.count', 1)
+            ->assertJsonPath('sums.total', '200.0000');
+
+        // No term — the whole range comes back.
+        $this->actingAsUser($admin)
+            ->getJson('/api/reports/sales')
+            ->assertOk()
+            ->assertJsonPath('sums.count', 3);
     }
 
     public function test_sales_audit_returns_per_product_movement_rows(): void
@@ -234,31 +281,6 @@ class ReportTest extends TestCase
         $this->actingAsUser($supervisor)
             ->getJson('/api/reports/staff-sales/export')
             ->assertForbidden();
-    }
-
-    /**
-     * Read a downloaded .xlsx response back into a 0-indexed array of rows
-     * (each row an array of cell values). Falls back to the streamed file path
-     * when the test client did not buffer the body into getContent().
-     */
-    private function readExportRows($response): array
-    {
-        $bytes = $response->getContent();
-
-        if ($bytes === '' || $bytes === false) {
-            $base = $response->baseResponse;
-            if (method_exists($base, 'getFile')) {
-                $bytes = file_get_contents($base->getFile()->getPathname());
-            }
-        }
-
-        $temp = tempnam(sys_get_temp_dir(), 'exptest').'.xlsx';
-        file_put_contents($temp, $bytes);
-
-        $sheet = (new XlsxReader)->load($temp)->getActiveSheet();
-        @unlink($temp);
-
-        return $sheet->toArray(null, true, false, false);
     }
 
     public function test_dashboard_summary_excludes_voided_sales(): void

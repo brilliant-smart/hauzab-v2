@@ -47,4 +47,29 @@ abstract class TestCase extends BaseTestCase
 
         $this->artisan('migrate', ['--force' => true])->run();
     }
+
+    /**
+     * Read a downloaded .xlsx response back into a 0-indexed array of rows
+     * (each row an array of cell values). Falls back to the streamed file path
+     * when the test client did not buffer the body into getContent().
+     */
+    protected function readExportRows($response): array
+    {
+        $bytes = $response->getContent();
+
+        if ($bytes === '' || $bytes === false) {
+            $base = $response->baseResponse;
+            if (method_exists($base, 'getFile')) {
+                $bytes = file_get_contents($base->getFile()->getPathname());
+            }
+        }
+
+        $temp = tempnam(sys_get_temp_dir(), 'exptest').'.xlsx';
+        file_put_contents($temp, $bytes);
+
+        $sheet = (new \PhpOffice\PhpSpreadsheet\Reader\Xlsx)->load($temp)->getActiveSheet();
+        @unlink($temp);
+
+        return $sheet->toArray(null, true, false, false);
+    }
 }

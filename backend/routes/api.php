@@ -49,6 +49,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Catalog browse — available to any signed-in staff member.
     Route::get('products', [ProductController::class, 'index']);
     Route::get('products/low-stock', [ProductController::class, 'lowStock']);
+    // Low-stock Excel export — admin only, per the exports rule. Registered
+    // before the {product} wildcard so "export" isn't bound as an id.
+    Route::get('products/low-stock/export', [ProductController::class, 'lowStockExport'])->middleware('role:admin');
     Route::get('products/expiring', [ProductController::class, 'expiring']);
     // Registered before the {product} wildcard so "import" isn't bound as an id.
     Route::get('products/import/template', [ProductController::class, 'importTemplate'])

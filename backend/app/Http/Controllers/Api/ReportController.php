@@ -19,6 +19,27 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 class ReportController extends Controller
 {
     use StreamsExports;
+
+    /**
+     * The shared search filter for the sales report list, sums, and export: a
+     * receipt can be found by its number, its customer, or what was sold —
+     * matching Sales History's search. Applied through ->when() so an absent
+     * term leaves the date-range index untouched.
+     */
+    private function applySearch($query, Request $request)
+    {
+        return $query->when($request->filled('search'), function ($q) use ($request) {
+            $term = $request->string('search');
+            $q->where(fn ($inner) => $inner
+                ->where('number', 'like', "%{$term}%")
+                ->orWhere('legacy_number', 'like', "%{$term}%")
+                ->orWhere('customer_name', 'like', "%{$term}%")
+                // Match any line's product so a sale can be found by what was
+                // sold, not just its number or customer.
+                ->orWhereHas('items', fn ($iq) => $iq->where('product_name', 'like', "%{$term}%")));
+        });
+    }
+
     /** Sales Report — order-level list with footer sums. */
     public function sales(Request $request)
     {
@@ -27,22 +48,30 @@ class ReportController extends Controller
 
         $statuses = [OrderStatus::Completed->value, OrderStatus::Credit->value];
 
-        $orders = Order::query()
-            ->with(['items', 'payments', 'user', 'customer'])
-            ->where('tenant_id', $user->tenant_id)
-            ->whereIn('status', $statuses)
-            ->when($from, fn ($q) => $q->where('created_at', '>=', $from))
-            ->when($to, fn ($q) => $q->where('created_at', '<=', $to))
-            ->when(! $user->isAtLeast(Role::Supervisor), fn ($q) => $q->where('user_id', $user->id))
+        $orders = $this->applySearch(
+            Order::query()
+                ->with(['items', 'payments', 'user', 'customer'])
+                ->where('tenant_id', $user->tenant_id)
+                ->whereIn('status', $statuses)
+                ->when($from, fn ($q) => $q->where('created_at', '>=', $from))
+                ->when($to, fn ($q) => $q->where('created_at', '<=', $to))
+                ->when(! $user->isAtLeast(Role::Supervisor), fn ($q) => $q->where('user_id', $user->id)),
+            $request,
+        )
             ->latest()
             ->paginate($request->integer('per_page', 25))
             ->withQueryString();
 
-        $sums = Order::where('tenant_id', $user->tenant_id)
-            ->whereIn('status', $statuses)
-            ->when($from, fn ($q) => $q->where('created_at', '>=', $from))
-            ->when($to, fn ($q) => $q->where('created_at', '<=', $to))
-            ->when(! $user->isAtLeast(Role::Supervisor), fn ($q) => $q->where('user_id', $user->id))
+        // The footer sums run over the same filters as the list, so a search
+        // result reports the totals of what is on screen — not the whole range.
+        $sums = $this->applySearch(
+            Order::where('tenant_id', $user->tenant_id)
+                ->whereIn('status', $statuses)
+                ->when($from, fn ($q) => $q->where('created_at', '>=', $from))
+                ->when($to, fn ($q) => $q->where('created_at', '<=', $to))
+                ->when(! $user->isAtLeast(Role::Supervisor), fn ($q) => $q->where('user_id', $user->id)),
+            $request,
+        )
             ->selectRaw('COUNT(*) as count, COALESCE(SUM(total),0) as total, COALESCE(SUM(amount_paid),0) as amount_paid')
             ->first();
 
@@ -156,13 +185,16 @@ class ReportController extends Controller
 
         $row = 2;
         $widths = array_map('strlen', $headers);
-        Order::query()
-            ->with(['items', 'user', 'customer'])
-            ->where('tenant_id', $user->tenant_id)
-            ->whereIn('status', $statuses)
-            ->when($from, fn ($q) => $q->where('created_at', '>=', $from))
-            ->when($to, fn ($q) => $q->where('created_at', '<=', $to))
-            ->when(! $user->isAtLeast(Role::Supervisor), fn ($q) => $q->where('user_id', $user->id))
+        $this->applySearch(
+            Order::query()
+                ->with(['items', 'user', 'customer'])
+                ->where('tenant_id', $user->tenant_id)
+                ->whereIn('status', $statuses)
+                ->when($from, fn ($q) => $q->where('created_at', '>=', $from))
+                ->when($to, fn ($q) => $q->where('created_at', '<=', $to))
+                ->when(! $user->isAtLeast(Role::Supervisor), fn ($q) => $q->where('user_id', $user->id)),
+            $request,
+        )
             ->chunkById(1000, function ($orders) use ($sheet, &$row, &$widths) {
                 foreach ($orders as $o) {
                     $cells = [

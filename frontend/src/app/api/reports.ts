@@ -64,3 +64,7 @@ export function downloadSalesAuditExport(params: Record<string, unknown>): Promi
 export function downloadStaffSalesExport(params: Record<string, unknown>): Promise<void> {
   return downloadExport("reports/staff-sales/export", params, "staff-sales.xlsx");
 }
+
+export function downloadLowStockExport(): Promise<void> {
+  return downloadExport("products/low-stock/export", {}, "low-stock.xlsx");
+}

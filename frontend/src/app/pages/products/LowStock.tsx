@@ -1,8 +1,13 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Pencil, Plus } from "lucide-react";
+import { toast } from "sonner";
+import { Download, Pencil, Plus } from "lucide-react";
 import { useLowStock } from "@/app/api/catalog";
+import { downloadLowStockExport } from "@/app/api/reports";
 import { Product } from "@/app/api/types";
+import { useAuth } from "@/app/auth/AuthContext";
+import { isAdmin } from "@/app/auth/guards";
+import { handleApiError } from "@/app/lib/errorHandler";
 import { formatCurrency, formatDate, formatNumber } from "@/app/lib/format";
 import { PageHeader } from "@/components/PageHeader";
 import { DataTable, Column } from "@/components/DataTable";
@@ -10,7 +15,23 @@ import { Button } from "@/components/ui/button";
 
 export default function LowStock() {
   const [page, setPage] = useState(1);
+  const [exporting, setExporting] = useState(false);
+  const { user } = useAuth();
+  // Exports are admin-only, same rule as the report and audit-trail exports.
+  const canExport = isAdmin(user);
   const { data, isLoading, isFetching, isError, refetch } = useLowStock({ page });
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      await downloadLowStockExport();
+      toast.success("Export ready");
+    } catch (err) {
+      handleApiError(err, "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const columns: Column<Product>[] = [
     { key: "sn", header: "S/N", className: "w-16", cell: (_p, i) => i + 1 },
@@ -71,11 +92,18 @@ export default function LowStock() {
         title="Product Reminder"
         description="Items at or below their reorder level"
         actions={
-          <Button asChild>
-            <Link to="/products/new">
-              <Plus className="size-4" /> Add New
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            {canExport && (
+              <Button variant="outline" onClick={handleExport} disabled={exporting}>
+                <Download className="size-4" /> {exporting ? "Exporting…" : "Export Excel"}
+              </Button>
+            )}
+            <Button asChild>
+              <Link to="/products/new">
+                <Plus className="size-4" /> Add New
+              </Link>
+            </Button>
+          </div>
         }
       />
       <DataTable
