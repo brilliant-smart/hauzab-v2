@@ -4,13 +4,14 @@ import { toast } from "sonner";
 import { Archive, ArchiveRestore, Download, Pencil, Plus, Upload } from "lucide-react";
 import {
   downloadProductTemplate,
+  downloadProductsExport,
   useImportProducts,
   useProducts,
   useSetProductActive,
 } from "@/app/api/catalog";
 import { Product } from "@/app/api/types";
 import { useAuth } from "@/app/auth/AuthContext";
-import { canManageProducts } from "@/app/auth/guards";
+import { canManageProducts, isAdmin } from "@/app/auth/guards";
 import { handleApiError } from "@/app/lib/errorHandler";
 import { formatCurrency, formatNumber } from "@/app/lib/format";
 import { PageHeader } from "@/components/PageHeader";
@@ -34,9 +35,24 @@ export default function ProductList() {
   });
   const importMutation = useImportProducts();
   const setActiveMutation = useSetProductActive();
+  const [exporting, setExporting] = useState(false);
   const { user } = useAuth();
   const canManage = canManageProducts(user);
+  // Exports are admin-only, same rule as the report and audit-trail exports.
+  const canExport = isAdmin(user);
   const fileInput = useRef<HTMLInputElement>(null);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      await downloadProductsExport();
+      toast.success("Export ready");
+    } catch (e) {
+      handleApiError(e, "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const handleSetActive = (p: Product, active: boolean) => {
     setActiveMutation.mutate(
@@ -169,6 +185,11 @@ export default function ProductList() {
         title="Product List"
         actions={
           <div className="flex items-center gap-2">
+            {canExport && (
+              <Button variant="outline" onClick={handleExport} disabled={exporting}>
+                <Download className="size-4" /> {exporting ? "Exporting…" : "Export Excel"}
+              </Button>
+            )}
             {canManage && (
               <>
                 <input

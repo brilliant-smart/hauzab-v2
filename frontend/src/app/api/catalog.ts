@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/app/lib/api";
+import { downloadExport } from "@/app/lib/exportDownload";
 import {
   ContactResource,
   ListResponse,
@@ -217,4 +218,8 @@ export function useDeleteLookup(key: LookupKey) {
     mutationFn: async (id: number) => api.delete(`${key}/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: lookupKeys.list(key) }),
   });
+}
+
+export function downloadProductsExport(): Promise<void> {
+  return downloadExport("products/export", {}, "products.xlsx");
 }

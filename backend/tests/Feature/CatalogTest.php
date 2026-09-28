@@ -132,6 +132,39 @@ class CatalogTest extends TestCase
             ->assertForbidden();
     }
 
+    // The full-catalog export is admin only and carries EVERY product —
+    // retired ones flagged in the Status column — so an inventory printout
+    // never silently loses a row.
+    public function test_products_export_returns_every_product_for_admins_only(): void
+    {
+        [$tenant, $branch, $admin] = $this->admin();
+        $supervisor = $this->makeUser($tenant, $branch, Role::Supervisor);
+
+        Product::create([
+            'tenant_id' => $tenant->id, 'name' => 'Alpha',
+            'quantity' => 5, 'cost_price' => 10, 'selling_price' => 20,
+        ]);
+        Product::create([
+            'tenant_id' => $tenant->id, 'name' => 'Retired One',
+            'quantity' => 0, 'cost_price' => 10, 'selling_price' => 20, 'is_active' => false,
+        ]);
+
+        $response = $this->actingAsUser($admin)
+            ->getJson('/api/products/export')
+            ->assertOk()
+            ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+
+        $rows = $this->readExportRows($response);
+        $this->assertSame('Alpha', Arr::get($rows, '1.0'));
+        $this->assertSame('Retired One', Arr::get($rows, '2.0'));
+        $this->assertSame('Retired', Arr::get($rows, '2.10'));
+
+        // Supervisors may browse the list but not export it.
+        $this->actingAsUser($supervisor)
+            ->getJson('/api/products/export')
+            ->assertForbidden();
+    }
+
     public function test_expiring_lists_products_within_the_window(): void
     {
         [$tenant, $branch, $admin] = $this->admin();

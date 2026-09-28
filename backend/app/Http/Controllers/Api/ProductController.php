@@ -211,6 +211,49 @@ class ProductController extends Controller
         return $this->streamSpreadsheet($spreadsheet, $this->exportName('low-stock', null, null));
     }
 
+    /** Full product-list Excel export — the entire catalog, retired included (admin only). */
+    public function allExport()
+    {
+        $this->prepareExport();
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $headers = ['Name', 'Barcode', 'Unit', 'Size', 'Quantity', 'Cost Price', 'Selling Price', 'Order Level', 'Manufactured Date', 'Expire Date', 'Status'];
+        $sheet->fromArray([$headers], null, 'A1');
+
+        $row = 2;
+        $widths = array_map('strlen', $headers);
+        // The whole catalog — retired rows stay in, flagged in the Status
+        // column, so an inventory printout never silently loses a product.
+        Product::query()
+            ->with('unit')
+            ->orderBy('name')
+            ->chunkById(1000, function ($products) use ($sheet, &$row, &$widths) {
+                foreach ($products as $p) {
+                    $cells = [
+                        $p->name,
+                        $p->barcode,
+                        $p->unit?->name,
+                        $p->size,
+                        (float) $p->quantity,
+                        (float) $p->cost_price,
+                        (float) $p->selling_price,
+                        (int) $p->reorder_level,
+                        optional($p->manufacture_date)->toDateString(),
+                        optional($p->expire_date)->toDateString(),
+                        $p->is_active ? 'Active' : 'Retired',
+                    ];
+                    $this->trackWidths($widths, $cells);
+                    $sheet->fromArray([$cells], null, "A{$row}");
+                    $row++;
+                }
+            });
+
+        $this->styleSheet($sheet, $headers, [6, 7], $widths); // Cost Price, Selling Price
+
+        return $this->streamSpreadsheet($spreadsheet, 'products-'.Carbon::today()->toDateString().'.xlsx');
+    }
+
     public function expiring(Request $request)
     {
         $days = $request->integer('days', 90);
